@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/Kfilter/Kfilter.iml" filepath="$PROJECT_DIR$/Kfilter/Kfilter.iml" />
+      <module fileurl="file://$PROJECT_DIR$/KfilterProject.iml" filepath="$PROJECT_DIR$/KfilterProject.iml" />
+      <module fileurl="file://$PROJECT_DIR$/KfilterSample/KfilterSample.iml" filepath="$PROJECT_DIR$/KfilterSample/KfilterSample.iml" />
+    </modules>
+  </component>
+</project>
