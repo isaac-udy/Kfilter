@@ -1,7 +1,7 @@
 package com.isaacudy.kfilter.processor
 
 import android.graphics.Bitmap
-import android.media.cts.OutputSurface
+import com.isaacudy.kfilter.rendering.OutputSurface
 import android.opengl.*
 import com.isaacudy.kfilter.*
 import com.isaacudy.kfilter.utils.checkGlError

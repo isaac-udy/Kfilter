@@ -1,8 +1,8 @@
 package com.isaacudy.kfilter.processor
 
 import android.media.*
-import android.media.cts.InputSurface
-import android.media.cts.OutputSurface
+import com.isaacudy.kfilter.rendering.InputSurface
+import com.isaacudy.kfilter.rendering.OutputSurface
 import android.util.Log
 import com.isaacudy.kfilter.Kfilter
 import java.io.File

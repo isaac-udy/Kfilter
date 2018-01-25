@@ -1,5 +1,3 @@
-package android.media.cts
-
 /*
  * Copyright (C) 2013 The Android Open Source Project
  *
@@ -14,7 +12,11 @@ package android.media.cts
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Modifications copyright (C) 2018 Isaac Udy
  */
+
+package com.isaacudy.kfilter.rendering
 
 import android.opengl.EGL14
 import android.opengl.EGLConfig
@@ -22,7 +24,6 @@ import android.opengl.EGLContext
 import android.opengl.EGLDisplay
 import android.opengl.EGLExt
 import android.opengl.EGLSurface
-import android.util.Log
 import android.view.Surface
 import com.isaacudy.kfilter.utils.checkEglError
 
@@ -38,7 +39,7 @@ private const val EGL_OPENGL_ES2_BIT = 4
  * to create an EGL window surface.  Calls to eglSwapBuffers() cause a frame of data to be sent
  * to the video encoder.
  */
-class InputSurface(surface: Surface?) {
+internal class InputSurface(surface: Surface?) {
     private var mEGLDisplay: EGLDisplay? = null
     private var mEGLContext: EGLContext? = null
     private var mEGLSurface: EGLSurface? = null
@@ -71,17 +72,20 @@ class InputSurface(surface: Surface?) {
         }
         // Configure EGL for pbuffer and OpenGL ES 2.0.  We want enough RGB bits
         // to be able to tell if the frame is reasonable.
-        val attribList = intArrayOf(EGL14.EGL_RED_SIZE, 8, EGL14.EGL_GREEN_SIZE, 8, EGL14.EGL_BLUE_SIZE, 8, EGL14.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL_RECORDABLE_ANDROID, 1, EGL14.EGL_NONE)
+        val attributes = intArrayOf(EGL14.EGL_RED_SIZE, 8,
+                EGL14.EGL_GREEN_SIZE, 8,
+                EGL14.EGL_BLUE_SIZE, 8,
+                EGL14.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+                EGL_RECORDABLE_ANDROID, 1,
+                EGL14.EGL_NONE)
         val configs = arrayOfNulls<EGLConfig>(1)
         val numConfigs = IntArray(1)
-        if (!EGL14.eglChooseConfig(mEGLDisplay, attribList, 0, configs, 0, configs.size,
-                numConfigs, 0)) {
+        if (!EGL14.eglChooseConfig(mEGLDisplay, attributes, 0, configs, 0, configs.size, numConfigs, 0)) {
             throw RuntimeException("unable to find RGB888+recordable ES2 EGL config")
         }
         // Configure context for OpenGL ES 3.0.
-        val attrib_list = intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 3, EGL14.EGL_NONE)
-        mEGLContext = EGL14.eglCreateContext(mEGLDisplay, configs[0], EGL14.EGL_NO_CONTEXT,
-                attrib_list, 0)
+        val contextAttributes = intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 3, EGL14.EGL_NONE)
+        mEGLContext = EGL14.eglCreateContext(mEGLDisplay, configs[0], EGL14.EGL_NO_CONTEXT, contextAttributes, 0)
         checkEglError("eglCreateContext")
         if (mEGLContext == null) {
             throw RuntimeException("null context")

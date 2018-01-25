@@ -1,5 +1,3 @@
-package android.media.cts
-
 /*
  * Copyright (C) 2013 The Android Open Source Project
  *
@@ -14,7 +12,11 @@ package android.media.cts
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Modifications copyright (C) 2018 Isaac Udy
  */
+
+package com.isaacudy.kfilter.rendering
 
 import android.graphics.SurfaceTexture
 import android.opengl.EGL14
@@ -48,20 +50,22 @@ import javax.microedition.khronos.egl.EGLSurface
  * By default, the Surface will be using a BufferQueue in asynchronous mode, so we
  * can potentially drop frames.
  */
-class OutputSurface(kfilter: Kfilter, initEgl: Boolean = false) : SurfaceTexture.OnFrameAvailableListener {
-    private var mEGL: EGL10? = null
-    private var mEGLDisplay: EGLDisplay? = null
-    private var mEGLContext: EGLContext? = null
-    private var mEGLSurface: EGLSurface? = null
-    var mSurfaceTexture: SurfaceTexture? = null
+internal class OutputSurface(kfilter: Kfilter, initEgl: Boolean = false) : SurfaceTexture.OnFrameAvailableListener {
+    private var egl: EGL10? = null
+    private var eglDisplay: EGLDisplay? = null
+    private var eglContext: EGLContext? = null
+    private var eglSurface: EGLSurface? = null
+    private var surfaceTexture: SurfaceTexture? = null
+
     /**
      * Returns the Surface that we draw onto.
      */
     var surface: Surface? = null
         private set
-    private val mFrameSyncObject = Object()     // guards mFrameAvailable
-    private var mFrameAvailable: Boolean = false
-    private var mTextureRender: TextureRender? = null
+
+    private val mutex = Object() // guards frameAvailable
+    private var frameAvailable: Boolean = false
+    private var textureRender: KfilterRenderer? = null
 
     private val width: Int = kfilter.outputWidth
     private val height: Int = kfilter.outputHeight
@@ -83,20 +87,21 @@ class OutputSurface(kfilter: Kfilter, initEgl: Boolean = false) : SurfaceTexture
     }
 
     /**
-     * Creates instances of TextureRender and SurfaceTexture, and a Surface associated
+     * Creates instances of KfilterRenderer and SurfaceTexture, and a Surface associated
      * with the SurfaceTexture.
      */
     private fun setup(kfilterShader: Kfilter) {
         kfilterShader.externalTexture.initialise()
-        mTextureRender = TextureRender(kfilterShader)
-        mTextureRender!!.surfaceCreated()
+        textureRender = KfilterRenderer(kfilterShader).apply { initialise() }
+
         // Even if we don't access the SurfaceTexture after the constructor returns, we
         // still need to keep a reference to it.  The Surface doesn't retain a reference
         // at the Java level, so if we don't either then the object can get GCed, which
         // causes the native finalizer to run.
-        if (VERBOSE) Log.d(TAG, "textureID=" + mTextureRender!!.textureId)
-        mSurfaceTexture = SurfaceTexture(mTextureRender!!.textureId)
-        mSurfaceTexture!!.setDefaultBufferSize(width, height)
+        if (VERBOSE) Log.d(TAG, "textureID=" + textureRender!!.textureId)
+        surfaceTexture = SurfaceTexture(textureRender!!.textureId)
+        surfaceTexture!!.setDefaultBufferSize(width, height)
+
         // This doesn't work if OutputSurface is created on the thread that CTS started for
         // these test cases.
         //
@@ -108,41 +113,46 @@ class OutputSurface(kfilter: Kfilter, initEgl: Boolean = false) : SurfaceTexture
         //
         // Java language note: passing "this" out of a constructor is generally unwise,
         // but we should be able to get away with it here.
-        mSurfaceTexture!!.setOnFrameAvailableListener(this)
-        surface = Surface(mSurfaceTexture)
+        surfaceTexture!!.setOnFrameAvailableListener(this)
+        surface = Surface(surfaceTexture)
     }
 
     /**
      * Prepares EGL.  We want a GLES 2.0 context and a surface that supports pbuffer.
      */
     private fun eglSetup(width: Int, height: Int) {
-        mEGL = EGLContext.getEGL() as EGL10
-        mEGLDisplay = mEGL!!.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY)
-        if (!mEGL!!.eglInitialize(mEGLDisplay, null)) {
+        egl = EGLContext.getEGL() as EGL10
+        eglDisplay = egl!!.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY)
+        if (!egl!!.eglInitialize(eglDisplay, null)) {
             throw RuntimeException("unable to initialize EGL10")
         }
         // Configure EGL for pbuffer and OpenGL ES 2.0.  We want enough RGB bits
         // to be able to tell if the frame is reasonable.
-        val attribList = intArrayOf(EGL10.EGL_RED_SIZE, 8, EGL10.EGL_GREEN_SIZE, 8, EGL10.EGL_BLUE_SIZE, 8, EGL10.EGL_ALPHA_SIZE, 8, EGL10.EGL_SURFACE_TYPE, EGL10.EGL_PBUFFER_BIT, EGL10.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL10.EGL_NONE)
+        val attributes = intArrayOf(EGL10.EGL_RED_SIZE, 8,
+                EGL10.EGL_GREEN_SIZE, 8,
+                EGL10.EGL_BLUE_SIZE, 8,
+                EGL10.EGL_ALPHA_SIZE, 8,
+                EGL10.EGL_SURFACE_TYPE, EGL10.EGL_PBUFFER_BIT,
+                EGL10.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+                EGL10.EGL_NONE)
         val configs = arrayOfNulls<EGLConfig>(1)
         val numConfigs = IntArray(1)
-        if (!mEGL!!.eglChooseConfig(mEGLDisplay, attribList, configs, 1, numConfigs)) {
+        if (!egl!!.eglChooseConfig(eglDisplay, attributes, configs, 1, numConfigs)) {
             throw RuntimeException("unable to find RGB888+pbuffer EGL config")
         }
         // Configure context for OpenGL ES 2.0.
-        val attrib_list = intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL10.EGL_NONE)
-        mEGLContext = mEGL!!.eglCreateContext(mEGLDisplay, configs[0], EGL10.EGL_NO_CONTEXT,
-                attrib_list)
+        val contextAttributes = intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL10.EGL_NONE)
+        eglContext = egl!!.eglCreateContext(eglDisplay, configs[0], EGL10.EGL_NO_CONTEXT, contextAttributes)
         checkEglError("eglCreateContext")
-        if (mEGLContext == null) {
+        if (eglContext == null) {
             throw RuntimeException("null context")
         }
         // Create a pbuffer surface.  By using this for output, we can use glReadPixels
         // to test values in the output.
         val surfaceAttribs = intArrayOf(EGL10.EGL_WIDTH, width, EGL10.EGL_HEIGHT, height, EGL10.EGL_NONE)
-        mEGLSurface = mEGL!!.eglCreatePbufferSurface(mEGLDisplay, configs[0], surfaceAttribs)
+        eglSurface = egl!!.eglCreatePbufferSurface(eglDisplay, configs[0], surfaceAttribs)
         checkEglError("eglCreatePbufferSurface")
-        if (mEGLSurface == null) {
+        if (eglSurface == null) {
             throw RuntimeException("surface was null")
         }
     }
@@ -151,39 +161,39 @@ class OutputSurface(kfilter: Kfilter, initEgl: Boolean = false) : SurfaceTexture
      * Discard all resources held by this class, notably the EGL context.
      */
     fun release() {
-        if (mEGL != null) {
-            if (mEGL!!.eglGetCurrentContext() == mEGLContext) {
+        egl?.apply {
+            if (eglGetCurrentContext() == eglContext) {
                 // Clear the current context and surface to ensure they are discarded immediately.
-                mEGL!!.eglMakeCurrent(mEGLDisplay, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_SURFACE,
+                eglMakeCurrent(eglDisplay, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_SURFACE,
                         EGL10.EGL_NO_CONTEXT)
             }
-            mEGL!!.eglDestroySurface(mEGLDisplay, mEGLSurface)
-            mEGL!!.eglDestroyContext(mEGLDisplay, mEGLContext)
-            //mEGL.eglTerminate(mEGLDisplay);
+            eglDestroySurface(eglDisplay, eglSurface)
+            eglDestroyContext(eglDisplay, eglContext)
         }
-        surface!!.release()
+        surface?.release()
+
         // this causes a bunch of warnings that appear harmless but might confuse someone:
         //  W BufferQueue: [unnamed-3997-2] cancelBuffer: BufferQueue has been abandoned!
-        //mSurfaceTexture.release();
+        //surfaceTexture.release();
         // null everything out so future attempts to use this object will cause an NPE
-        mEGLDisplay = null
-        mEGLContext = null
-        mEGLSurface = null
-        mEGL = null
-        mTextureRender = null
+        eglDisplay = null
+        eglContext = null
+        eglSurface = null
+        egl = null
+        textureRender = null
         surface = null
-        mSurfaceTexture = null
+        surfaceTexture = null
     }
 
     /**
      * Makes our EGL context and surface current.
      */
     fun makeCurrent() {
-        if (mEGL == null) {
+        if (egl == null) {
             throw RuntimeException("not configured for makeCurrent")
         }
         checkEglError("before makeCurrent")
-        if (!mEGL!!.eglMakeCurrent(mEGLDisplay, mEGLSurface, mEGLSurface, mEGLContext)) {
+        if (!egl!!.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
             throw RuntimeException("eglMakeCurrent failed")
         }
     }
@@ -195,13 +205,13 @@ class OutputSurface(kfilter: Kfilter, initEgl: Boolean = false) : SurfaceTexture
      */
     fun awaitNewImage() {
         val TIMEOUT_MS = 1000
-        synchronized(mFrameSyncObject) {
-            while (!mFrameAvailable) {
+        synchronized(mutex) {
+            while (!frameAvailable) {
                 try {
                     // Wait for onFrameAvailable() to signal us.  Use a timeout to avoid
                     // stalling the test if it doesn't arrive.
-                    mFrameSyncObject.wait(TIMEOUT_MS.toLong())
-                    if (!mFrameAvailable) {
+                    mutex.wait(TIMEOUT_MS.toLong())
+                    if (!frameAvailable) {
                         // TODO: if "spurious wakeup", continue while loop
                         throw RuntimeException("Surface frame wait timed out")
                     }
@@ -212,28 +222,28 @@ class OutputSurface(kfilter: Kfilter, initEgl: Boolean = false) : SurfaceTexture
                 }
 
             }
-            mFrameAvailable = false
+            frameAvailable = false
         }
-        mSurfaceTexture!!.updateTexImage()
+        surfaceTexture?.updateTexImage()
     }
 
     /**
      * Draws the data from SurfaceTexture onto the current EGL surface.
      */
     fun drawImage() {
-        mSurfaceTexture?.let {
-            mTextureRender?.draw(it)
+        surfaceTexture?.let {
+            textureRender?.draw(it)
         }
     }
 
     override fun onFrameAvailable(st: SurfaceTexture) {
         if (VERBOSE) Log.d(TAG, "new frame available")
-        synchronized(mFrameSyncObject) {
-            if (mFrameAvailable) {
-                throw RuntimeException("mFrameAvailable already set, frame could be dropped")
+        synchronized(mutex) {
+            if (frameAvailable) {
+                throw RuntimeException("frameAvailable already set, frame could be dropped")
             }
-            mFrameAvailable = true
-            mFrameSyncObject.notifyAll()
+            frameAvailable = true
+            mutex.notifyAll()
         }
     }
 
