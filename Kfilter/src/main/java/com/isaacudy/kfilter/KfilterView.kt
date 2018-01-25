@@ -1,8 +1,7 @@
-package com.isaacudy.kfilter.view
+package com.isaacudy.kfilter
 
 import android.animation.ValueAnimator
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.SurfaceTexture
 import android.media.MediaPlayer
 import android.util.AttributeSet
@@ -11,11 +10,8 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.Surface
 import android.view.TextureView
-import com.isaacudy.kfilter.BaseKfilter
-import com.isaacudy.kfilter.Kfilter
-import com.isaacudy.kfilter.KfilterMediaFile
-import com.isaacudy.kfilter.MediaType
 import com.isaacudy.kfilter.processor.KfilterProcessor
+import com.isaacudy.kfilter.rendering.KfilterMediaRenderer
 import com.isaacudy.kfilter.utils.ExternalTexture
 import com.isaacudy.kfilter.utils.loadBitmap
 import java.io.IOException
@@ -104,7 +100,10 @@ class KfilterView @JvmOverloads constructor(context: Context,
         contentFile?.let {
             val selected = kfilters[selectedKfilter]
             val processor = KfilterProcessor(selected, it.path)
-            processor.onError = { triggerError(ERROR_SAVE) }
+            processor.onError = {
+                Log.e("KfilterView", "KfilterProcessor encountered an error", it)
+                triggerError(ERROR_SAVE)
+            }
             processor.save(savePath)
         }
     }
@@ -157,6 +156,11 @@ class KfilterView @JvmOverloads constructor(context: Context,
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (!gesturesEnabled) return false
 
+        if (event.action == MotionEvent.ACTION_DOWN) {
+            offsetAnimator?.apply { cancel() }
+            offsetAnimator = null
+        }
+
         if (event.action == MotionEvent.ACTION_UP) {
             offsetAnimator?.apply { cancel() }
             offsetAnimator = null
@@ -167,6 +171,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
             }
             offsetAnimator?.start()
         }
+
         gestureDetector.onTouchEvent(event)
         return true
     }

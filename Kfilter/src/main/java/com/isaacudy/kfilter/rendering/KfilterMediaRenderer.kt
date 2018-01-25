@@ -1,9 +1,13 @@
-// https://www.virag.si/2014/03/rendering-video-with-opengl-on-android/ & https://github.com/izacus/AndroidOpenGLVideoDemo
-package com.isaacudy.kfilter.view
+/*
+ * https://github.com/izacus/AndroidOpenGLVideoDemo/blob/master/LICENSE
+ *
+ * Modifications copyright (C) 2018 Isaac Udy
+ */
+
+package com.isaacudy.kfilter.rendering
 
 import android.graphics.SurfaceTexture
 import android.opengl.GLES20
-import android.opengl.Matrix
 
 import com.isaacudy.kfilter.utils.ExternalTexture
 import com.isaacudy.kfilter.Kfilter
@@ -13,13 +17,14 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
 
     var mediaTexture: SurfaceTexture? = null
         private set
+
     private var frameAvailable = false
     private var adjustViewport = false
 
-    private var kfilter: KfilterTextureRenderer? = null
-    private var queuedPrimaryKfilter: KfilterTextureRenderer? = null
-    private var secondaryKfilter: KfilterTextureRenderer? = null
-    private var queuedSecondaryKfilter: KfilterTextureRenderer? = null
+    private var kfilter: KfilterRenderer? = null
+    private var queuedPrimaryKfilter: KfilterRenderer? = null
+    private var secondaryKfilter: KfilterRenderer? = null
+    private var queuedSecondaryKfilter: KfilterRenderer? = null
 
     var filterOffset: Float = 0f
         set(value) {
@@ -28,55 +33,41 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
             if (field < -1f) field = -1f
         }
 
-    private val stMatrix = FloatArray(16)
-
-    private fun setupVertexBuffer() {
-        Matrix.setIdentityM(stMatrix, 0)
-    }
-
-    private fun setupTexture() {
-        if (mediaTexture != null) return
-        mediaTexture = SurfaceTexture(externalTexture.id).apply {
-            setOnFrameAvailableListener(this@KfilterMediaRenderer)
-        }
-    }
-
     override fun draw(): Boolean {
         if (adjustViewport) {
             adjustViewport()
         }
 
-        synchronized(this) {
-            queuedPrimaryKfilter?.let {
-                kfilter?.release()
-                kfilter = it
-                queuedPrimaryKfilter = null
+        queuedPrimaryKfilter?.let {
+            kfilter?.release()
+            kfilter = it
+            queuedPrimaryKfilter = null
 
-                if (!it.isInitialised) {
-                    it.setDimensions(mediaWidth, mediaHeight, width, height)
-                    it.initialise(externalTexture)
-                }
+            if (!it.initialised) {
+                it.kfilter.externalTexture = externalTexture
+                it.setDimensions(mediaWidth, mediaHeight, width, height)
+                it.initialise()
             }
-            queuedSecondaryKfilter?.let {
-                secondaryKfilter?.release()
-                secondaryKfilter = it
-                queuedSecondaryKfilter = null
+        }
+        queuedSecondaryKfilter?.let {
+            secondaryKfilter?.release()
+            secondaryKfilter = it
+            queuedSecondaryKfilter = null
 
-                if (!it.isInitialised) {
-                    it.setDimensions(mediaWidth, mediaHeight, width, height)
-                    it.initialise(externalTexture)
-                }
+            if (!it.initialised) {
+                it.kfilter.externalTexture = externalTexture
+                it.setDimensions(mediaWidth, mediaHeight, width, height)
+                it.initialise()
             }
-            if (kfilter == null) return false
+        }
+        if (kfilter == null) return false
 
-            if (frameAvailable) {
-                mediaTexture?.updateTexImage()
-                mediaTexture?.getTransformMatrix(stMatrix)
-                frameAvailable = false
-            }
-            else {
-                return false
-            }
+        if (frameAvailable) {
+            mediaTexture?.updateTexImage()
+            frameAvailable = false
+        }
+        else {
+            return false
         }
 
         val surfaceTexture = mediaTexture ?: return false
@@ -85,14 +76,16 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT or GLES20.GL_COLOR_BUFFER_BIT)
 
-        if (filterOffset == 0f || secondaryKfilter == null) {
-            kfilter?.draw(surfaceTexture, 1f, false)
-        }
-        else {
-            val slidingLeft = filterOffset < 0
-            val currentOffset = filterOffset
-            kfilter?.draw(surfaceTexture, 1 - Math.abs(currentOffset), !slidingLeft)
-            secondaryKfilter?.draw(surfaceTexture, Math.abs(currentOffset) * 1.005f, slidingLeft)
+        synchronized(this) {
+            if (filterOffset == 0f || secondaryKfilter == null) {
+                kfilter?.draw(surfaceTexture)
+            }
+            else {
+                val slidingLeft = filterOffset < 0
+                val currentOffset = filterOffset
+                kfilter?.draw(surfaceTexture, 1 - Math.abs(currentOffset), !slidingLeft)
+                secondaryKfilter?.draw(surfaceTexture, Math.abs(currentOffset) * 1.005f, slidingLeft)
+            }
         }
         return true
     }
@@ -119,8 +112,10 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
     }
 
     override fun initGLComponents() {
-        setupVertexBuffer()
-        setupTexture()
+        if (mediaTexture != null) return
+        mediaTexture = SurfaceTexture(externalTexture.id).apply {
+            setOnFrameAvailableListener(this@KfilterMediaRenderer)
+        }
     }
 
     override fun deinitGLComponents() {
@@ -148,24 +143,28 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
     }
 
     fun setKfilter(kfilter: Kfilter) {
-        var alreadySet = false
-        this.kfilter?.let {
-            if (it.kfilter === kfilter) alreadySet = true
+        if(this.kfilter?.kfilter === kfilter){
+            return
         }
-        if (alreadySet) return
 
-        queuedPrimaryKfilter = KfilterTextureRenderer(kfilter).apply {
+        queuedPrimaryKfilter = KfilterRenderer(kfilter).apply {
             setDimensions(mediaWidth, mediaHeight, width, height)
         }
     }
 
     fun setKfilter(kfilter: Kfilter, secondaryKfilter: Kfilter?) {
+        if(this.kfilter?.kfilter === kfilter && this.secondaryKfilter?.kfilter === secondaryKfilter){
+            return
+        }
+
         if (this.kfilter?.kfilter == secondaryKfilter && this.secondaryKfilter?.kfilter == kfilter && secondaryKfilter != null) {
             // we are swapping the kfilters
-            val currentSecondary = this.secondaryKfilter
-            val currentPrimary = this.kfilter
-            this.secondaryKfilter = currentPrimary
-            this.kfilter = currentSecondary
+            synchronized(this) {
+                val currentSecondary = this.secondaryKfilter
+                val currentPrimary = this.kfilter
+                this.secondaryKfilter = currentPrimary
+                this.kfilter = currentSecondary
+            }
         }
         else {
             setKfilter(kfilter)
@@ -173,14 +172,14 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
         }
     }
 
-    fun setSecondaryKfilter(kfilter: Kfilter) {
+    private fun setSecondaryKfilter(kfilter: Kfilter) {
         var alreadySet = false
         secondaryKfilter?.let {
             if (it.kfilter === kfilter) alreadySet = true
         }
         if (alreadySet) return
 
-        queuedSecondaryKfilter = KfilterTextureRenderer(kfilter).apply {
+        queuedSecondaryKfilter = KfilterRenderer(kfilter).apply {
             setDimensions(mediaWidth, mediaHeight, width, height)
         }
     }

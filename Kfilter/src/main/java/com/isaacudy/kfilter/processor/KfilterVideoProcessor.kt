@@ -1,8 +1,8 @@
 package com.isaacudy.kfilter.processor
 
 import android.media.*
-import android.media.cts.InputSurface
-import android.media.cts.OutputSurface
+import com.isaacudy.kfilter.rendering.InputSurface
+import com.isaacudy.kfilter.rendering.OutputSurface
 import android.util.Log
 import com.isaacudy.kfilter.Kfilter
 import java.io.File
@@ -47,8 +47,8 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val path: String, val 
 
         var muxerStarted = false
 
-        val audioEncoder: MediaCodec
-        val audioDecoder: MediaCodec
+        val audioEncoder: MediaCodec?
+        val audioDecoder: MediaCodec?
 
         var timeout = 10_000L
 
@@ -66,7 +66,8 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val path: String, val 
                 // On some other devices, having an IFrame Interval of 0 will cause the encoder.configure to fail.
                 // In the case that we fail to configure the encoder above, we will set the IFrame Interval to 1 and try again.
                 // On the devices which IFrame value of 0 causes issues, it appears the video is clipped at the beginning and end,
-                // and I haven't found a way to detect if this will occur before encoding begins. Worth exploration in the future. 
+                // and I haven't found a way to detect if this will occur before encoding begins. Worth exploration in the future.
+                Log.d(TAG, "MediaCodec default config is not valid", e)
                 outputFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
                 encoder = MediaCodec.createEncoderByType(extractor.videoMimeType)
                 encoder.configure(outputFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
@@ -84,13 +85,19 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val path: String, val 
 
             extractor.audioFormat?.setInteger(MediaFormat.KEY_BIT_RATE, 128_000)
 
-            audioEncoder = MediaCodec.createEncoderByType(extractor.audioMimeType)
-            audioEncoder.configure(extractor.audioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-            audioEncoder.start()
+            if (extractor.audioMimeType != null) {
+                audioEncoder = MediaCodec.createEncoderByType(extractor.audioMimeType)
+                audioEncoder.configure(extractor.audioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+                audioEncoder.start()
 
-            audioDecoder = MediaCodec.createDecoderByType(extractor.audioMimeType)
-            audioDecoder.configure(extractor.audioFormat, null, null, 0)
-            audioDecoder.start()
+                audioDecoder = MediaCodec.createDecoderByType(extractor.audioMimeType)
+                audioDecoder.configure(extractor.audioFormat, null, null, 0)
+                audioDecoder.start()
+            }
+            else {
+                audioEncoder = null
+                audioDecoder = null
+            }
 
             File(pathOut).parentFile.mkdirs()
             muxer = MediaMuxer(pathOut, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
@@ -108,6 +115,11 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val path: String, val 
             var audioInputDone = false
             timeout = 10_000L
 
+            if (extractor.audioExtractor == null) {
+                audioInputDone = true
+                audioOutputDone = true
+            }
+
             try {
                 while (!videoOutputDone || !audioOutputDone) {
                     if (!videoOutputDone) {
@@ -122,9 +134,15 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val path: String, val 
                             decoderOutputAvailable = processDecoderOutput()
                         }
                     }
-                    if (!audioOutputDone && (!muxerStarted || videoOutputDone)) {
+
+                    val audioExtractor = extractor.audioExtractor
+                    if (!audioOutputDone
+                            && (!muxerStarted || videoOutputDone)
+                            && audioExtractor != null
+                            && audioDecoder != null
+                            && audioEncoder != null) {
                         if (!audioInputDone) {
-                            audioInputDone = processAudioDecoderInput(audioDecoder, extractor.audioExtractor)
+                            audioInputDone = processAudioDecoderInput(audioDecoder, audioExtractor)
                         }
 
                         var audioDecoderOutputAvailable = true
@@ -152,10 +170,10 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val path: String, val 
                      *
                      *  Therefore, when the muxer starts (i.e. both the video and audio encoders have
                      *  received their INFO_OUTPUT_FORMAT_CHANGED events), we reduce the timeout value
-                     *  from 10_000 (the default, 10ms) to 500 (0.5ms)
+                     *  from 10_000 (the default, 10ms) to 100 (0.1ms)
                      */
                     if (muxerStarted) {
-                        timeout = 10
+                        timeout = 100
                     }
                 }
             }
@@ -180,10 +198,10 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val path: String, val 
                 decoder.stop()
                 decoder.release()
 
-                audioDecoder.stop()
-                audioDecoder.release()
-                audioEncoder.stop()
-                audioEncoder.release()
+                audioDecoder?.stop()
+                audioDecoder?.release()
+                audioEncoder?.stop()
+                audioEncoder?.release()
             }
             onProgress(1.0f)
             onSuccess()
@@ -296,7 +314,7 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val path: String, val 
 
                 // now that we have the Magic Goodies, start the muxer
                 muxerVideoTrackIndex = muxer.addTrack(newFormat)
-                if (muxerVideoTrackIndex >= 0 && muxerAudioTrackIndex >= 0) {
+                if (muxerVideoTrackIndex >= 0 && (muxerAudioTrackIndex >= 0 || extractor.audioExtractor == null)) {
                     muxer.start()
                     muxerStarted = true
                 }
@@ -443,8 +461,8 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val path: String, val 
         val mimeType = extractor.videoMimeType
         var width = -1
         var height = -1
-        var frameRate = 30
-        var bitrate = 10_000_000
+        val frameRate = 30
+        val bitrate = 10_000_000
         val colorFormat = MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
 
         if (extractor.videoFormat.containsKey(MediaFormat.KEY_WIDTH))
@@ -471,7 +489,9 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val path: String, val 
         val AUDIO_TRACK_TYPE = "audio/"
 
         val videoExtractor: MediaExtractor
-        val audioExtractor: MediaExtractor
+        var audioExtractor: MediaExtractor?
+            private set
+
         val videoTrack: Int
         val audioTrack: Int
 
@@ -488,19 +508,19 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val path: String, val 
                 return videoFormat.getString(MediaFormat.KEY_MIME)
             }
 
-        val audioMimeType: String
+        val audioMimeType: String?
             get() {
-                if (audioFormat == null)
-                    throw IllegalStateException("File at '$path' has no audio track, cannot get mime type")
-                return audioFormat.getString(MediaFormat.KEY_MIME)
+                return audioFormat?.getString(MediaFormat.KEY_MIME)
             }
 
         init {
-            videoExtractor = MediaExtractor()
-            videoExtractor.setDataSource(path)
+            videoExtractor = MediaExtractor().apply {
+                setDataSource(path)
+            }
 
-            audioExtractor = MediaExtractor()
-            audioExtractor.setDataSource(path)
+            audioExtractor = MediaExtractor().apply {
+                setDataSource(path)
+            }
 
             videoTrack = getTrack(VIDEO_TRACK_TYPE)
             audioTrack = getTrack(AUDIO_TRACK_TYPE)
@@ -511,27 +531,40 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val path: String, val 
                 videoFormat = null
             }
 
-            if (hasAudioTrack) {
-                audioFormat = videoExtractor.getTrackFormat(audioTrack)
+            audioFormat = if (hasAudioTrack) {
+                videoExtractor.getTrackFormat(audioTrack)
             }
             else {
-                audioFormat = null
+                null
             }
+
             videoExtractor.selectTrack(videoTrack)
             videoExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
 
-            audioExtractor.selectTrack(audioTrack)
-            audioExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+            if (audioTrack >= 0) {
+                audioExtractor?.apply {
+                    selectTrack(audioTrack)
+                    seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+                }
+            }
+            else {
+                audioExtractor = null
+            }
         }
 
         fun getTrack(type: String): Int {
             val numTracks = videoExtractor.trackCount
             for (i in 0..numTracks) {
-                val trackFormat = videoExtractor.getTrackFormat(i)
-                val mimeType = trackFormat.getString(MediaFormat.KEY_MIME)
+                try {
+                    val trackFormat = videoExtractor.getTrackFormat(i)
+                    val mimeType = trackFormat.getString(MediaFormat.KEY_MIME)
 
-                if (mimeType.startsWith(type)) {
-                    return i
+                    if (mimeType.startsWith(type)) {
+                        return i
+                    }
+                }
+                catch (ex: Exception) {
+                    // Ignore errors related to grabbing track format
                 }
             }
             return -1

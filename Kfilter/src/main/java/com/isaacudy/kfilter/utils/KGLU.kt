@@ -1,5 +1,6 @@
 package com.isaacudy.kfilter.utils
 
+import android.opengl.EGL14
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.util.Log
@@ -50,6 +51,24 @@ fun checkGlError(op: String) {
     if (error != GLES20.GL_NO_ERROR) {
         Log.e(TAG, op + ": glError " + error)
 //        throw RuntimeException(op + ": glError " + error)
+    }
+}
+
+fun checkEglError(msg: String) {
+    var failed = false
+    while (true) {
+        val error = EGL14.eglGetError()
+        if(error != EGL14.EGL_SUCCESS) {
+            Log.e(TAG, msg + ": EGL error: 0x" + Integer.toHexString(error))
+            failed = true
+        }
+        else {
+            break
+        }
+    }
+
+    if (failed) {
+        throw RuntimeException("EGL error encountered (see log)")
     }
 }
 
