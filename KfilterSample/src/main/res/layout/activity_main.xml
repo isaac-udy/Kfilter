@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     tools:context="com.isaacudy.kfiltersample.MainActivity">
 
-    <com.isaacudy.kfilter.view.KfilterView
+    <com.isaacudy.kfilter.KfilterView
         android:id="@+id/kfilterView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>

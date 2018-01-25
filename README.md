@@ -33,7 +33,7 @@ allprojects {
 ```
 ```
 dependencies {
-	compile 'com.github.isaac-udy:Kfilter:1.0'
+	compile 'com.github.isaac-udy:Kfilter:1.0.1'
 }
 ```
 
