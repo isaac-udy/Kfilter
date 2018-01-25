@@ -221,7 +221,9 @@ class OutputSurface(kfilter: Kfilter, initEgl: Boolean = false) : SurfaceTexture
      * Draws the data from SurfaceTexture onto the current EGL surface.
      */
     fun drawImage() {
-        mTextureRender!!.drawFrame(mSurfaceTexture)
+        mSurfaceTexture?.let {
+            mTextureRender?.draw(it)
+        }
     }
 
     override fun onFrameAvailable(st: SurfaceTexture) {

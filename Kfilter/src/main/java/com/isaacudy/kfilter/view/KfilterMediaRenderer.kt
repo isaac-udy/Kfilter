@@ -2,6 +2,7 @@
 package com.isaacudy.kfilter.view
 
 import android.graphics.SurfaceTexture
+import android.media.cts.TextureRender
 import android.opengl.GLES20
 import android.opengl.Matrix
 
@@ -16,10 +17,10 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
     private var frameAvailable = false
     private var adjustViewport = false
 
-    private var kfilter: KfilterTextureRenderer? = null
-    private var queuedPrimaryKfilter: KfilterTextureRenderer? = null
-    private var secondaryKfilter: KfilterTextureRenderer? = null
-    private var queuedSecondaryKfilter: KfilterTextureRenderer? = null
+    private var kfilter: TextureRender? = null
+    private var queuedPrimaryKfilter: TextureRender? = null
+    private var secondaryKfilter: TextureRender? = null
+    private var queuedSecondaryKfilter: TextureRender? = null
 
     var filterOffset: Float = 0f
         set(value) {
@@ -52,20 +53,21 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
                 kfilter = it
                 queuedPrimaryKfilter = null
 
-                if (!it.isInitialised) {
-                    it.setDimensions(mediaWidth, mediaHeight, width, height)
-                    it.initialise(externalTexture)
-                }
+                it.surfaceCreated()
+//                if (!it.isInitialised) {
+//                    it.setDimensions(mediaWidth, mediaHeight, width, height)
+//                    it.initialise(externalTexture)
+//                }
             }
             queuedSecondaryKfilter?.let {
                 secondaryKfilter?.release()
                 secondaryKfilter = it
                 queuedSecondaryKfilter = null
-
-                if (!it.isInitialised) {
-                    it.setDimensions(mediaWidth, mediaHeight, width, height)
-                    it.initialise(externalTexture)
-                }
+                it.surfaceCreated()
+//                if (!it.isInitialised) {
+//                    it.setDimensions(mediaWidth, mediaHeight, width, height)
+//                    it.initialise(externalTexture)
+//                }
             }
             if (kfilter == null) return false
 
@@ -86,7 +88,7 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
         GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT or GLES20.GL_COLOR_BUFFER_BIT)
 
         if (filterOffset == 0f || secondaryKfilter == null) {
-            kfilter?.draw(surfaceTexture, 1f, false)
+            kfilter?.draw(surfaceTexture)
         }
         else {
             val slidingLeft = filterOffset < 0
@@ -101,8 +103,8 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
         val surfaceAspect = height / width.toFloat()
         val videoAspect = mediaHeight / mediaWidth.toFloat()
 
-        kfilter?.apply { setDimensions(mediaWidth, mediaHeight, width, height) }
-        queuedPrimaryKfilter?.apply { setDimensions(mediaWidth, mediaHeight, width, height) }
+//        kfilter?.apply { setDimensions(mediaWidth, mediaHeight, width, height) }
+//        queuedPrimaryKfilter?.apply { setDimensions(mediaWidth, mediaHeight, width, height) }
 
         if (surfaceAspect < videoAspect) {
             val newWidth = (height / videoAspect).toInt()
@@ -154,7 +156,7 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
         }
         if (alreadySet) return
 
-        queuedPrimaryKfilter = KfilterTextureRenderer(kfilter).apply {
+        queuedPrimaryKfilter = TextureRender(kfilter).apply {
             setDimensions(mediaWidth, mediaHeight, width, height)
         }
     }
@@ -180,7 +182,7 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
         }
         if (alreadySet) return
 
-        queuedSecondaryKfilter = KfilterTextureRenderer(kfilter).apply {
+        queuedSecondaryKfilter = TextureRender(kfilter).apply {
             setDimensions(mediaWidth, mediaHeight, width, height)
         }
     }
