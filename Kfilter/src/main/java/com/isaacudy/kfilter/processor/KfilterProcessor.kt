@@ -1,15 +1,19 @@
 package com.isaacudy.kfilter.processor
 
+import android.util.Log
 import com.isaacudy.kfilter.Kfilter
 import com.isaacudy.kfilter.KfilterMediaFile
 import com.isaacudy.kfilter.MediaType
 import java.io.File
 
+private const val TAG = "KfilterProcessor"
 class KfilterProcessor(kfilter: Kfilter, path: String) {
     private val kfilter = kfilter.copy()
     private val mediaFile = KfilterMediaFile(path)
 
-    var onError: (error: Exception) -> Unit = {}
+    var onError: (error: Exception) -> Unit = {
+        Log.e(TAG, "KfilterProcessor encountered an error", it)
+    }
     var onSuccess: () -> Unit = {}
     var onProgress: (progress: Float) -> Unit = {}
 
@@ -37,9 +41,9 @@ class KfilterProcessor(kfilter: Kfilter, path: String) {
             KfilterVideoProcessor(kfilter, mediaFile.path, finalPath)
         }
 
-        delegate.onError = onError
-        delegate.onSuccess = onSuccess
-        delegate.onProgress = onProgress
+        delegate.onError = { onError(it) }
+        delegate.onSuccess = { onSuccess() }
+        delegate.onProgress = { onProgress(it) }
 
         activeThread = Thread {
             Thread.currentThread().priority = Thread.MAX_PRIORITY

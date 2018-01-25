@@ -28,14 +28,15 @@ internal class KfilterImageProcessor(val shader: Kfilter, val path: String, val 
 
         fun performExecute(){
             shader.resize(mediaFile.mediaWidth, mediaFile.mediaHeight)
-            val outputSurface = OutputSurface(shader, mediaFile.mediaWidth, mediaFile.mediaHeight)
+            val outputSurface = OutputSurface(shader, true)
             outputSurface.makeCurrent()
 
             val bitmap = loadBitmap(mediaFile)
-            val canvas = outputSurface.surface.lockCanvas(null)
+            val surface = outputSurface.surface ?: return
+            val canvas = surface.lockCanvas(null)
             canvas.drawARGB(255, 0, 0, 0)
             canvas.drawBitmap(bitmap, 0f, 0f, null)
-            outputSurface.surface.unlockCanvasAndPost(canvas)
+            surface.unlockCanvasAndPost(canvas)
 
             outputSurface.awaitNewImage()
             outputSurface.drawImage()
