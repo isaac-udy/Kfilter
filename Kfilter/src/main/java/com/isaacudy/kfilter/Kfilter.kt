@@ -10,6 +10,11 @@ import com.isaacudy.kfilter.utils.ExternalTexture
  */
 abstract class Kfilter {
 
+    var inputWidth: Int = -1
+        private set
+    var inputHeight: Int = -1
+        private set
+
     var outputWidth: Int = -1
         private set
     var outputHeight: Int = -1
@@ -106,11 +111,13 @@ abstract class Kfilter {
      * Set the width and height of the photo or video that this Kfilter will be rendered onto.
      * @see onResize
      */
-    fun resize(width: Int, height: Int) {
-        if (width == outputWidth && height == outputHeight) return
+    fun resize(width: Int, height: Int, outputWidth: Int = width, outputHeight: Int = height) {
+        if (width == inputWidth && height == inputHeight) return
 
-        outputWidth = width
-        outputHeight = height
+        this.inputWidth = width
+        this.inputHeight = height
+        this.outputWidth = outputWidth
+        this.outputHeight = outputHeight
         onResize()
     }
 

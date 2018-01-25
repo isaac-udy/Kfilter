@@ -41,9 +41,6 @@ internal abstract class TextureSurfaceRenderer(private val texture: SurfaceTextu
     var isFinished: Boolean = false
         private set
 
-    private var lastFpsOutput: Long = 0
-    private var frames: Int = 0
-
     private val config: IntArray
         get() = intArrayOf(
                 EGL10.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
@@ -109,20 +106,21 @@ internal abstract class TextureSurfaceRenderer(private val texture: SurfaceTextu
 
     private fun initGL() {
         (EGLContext.getEGL() as EGL10).let {
+            egl = it
+
             eglDisplay = it.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY)
             val version = IntArray(2)
             it.eglInitialize(eglDisplay, version)
             val eglConfig = chooseEglConfig()
             eglContext = createContext(it, eglDisplay, eglConfig)
             eglSurface = it.eglCreateWindowSurface(eglDisplay, eglConfig, texture, null)
-            if (eglSurface == null || eglSurface === EGL10.EGL_NO_SURFACE) {
+            if (eglSurface == null || eglSurface == EGL10.EGL_NO_SURFACE) {
                 throw RuntimeException("GL Error: " + GLUtils.getEGLErrorString(it.eglGetError()))
             }
             if (!it.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
                 throw RuntimeException("GL Make current error: " + GLUtils.getEGLErrorString(it.eglGetError()))
             }
 
-            egl = it
         }
     }
 
@@ -144,7 +142,7 @@ internal abstract class TextureSurfaceRenderer(private val texture: SurfaceTextu
         val configsCount = IntArray(1)
         val configs = arrayOfNulls<EGLConfig>(1)
         val configSpec = config
-        val configChosen = egl?.eglChooseConfig(eglDisplay, configSpec, configs, 1, configsCount) ?: false
+        val configChosen = egl?.eglChooseConfig(eglDisplay, configSpec, configs, 1, configsCount) ?: true
         if (!configChosen) {
             throw IllegalArgumentException("Failed to choose config: " + GLUtils.getEGLErrorString(egl?.eglGetError() ?: 0))
         }

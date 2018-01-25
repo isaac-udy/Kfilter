@@ -53,13 +53,13 @@ open class OverlayFilter(internal val overlayItems: List<OverlayItem>) : Kfilter
         }
 
         if(overlayBitmap == null) {
-            overlayBitmap = OverlayItem.createOverlayBitmap(overlayItems, outputWidth, outputHeight)
+            overlayBitmap = OverlayItem.createOverlayBitmap(overlayItems, inputWidth, inputHeight)
         }
         else {
             overlayBitmap?.let {
-                if(it.width != outputWidth || it.height != outputHeight){
+                if(it.width != inputWidth || it.height != inputHeight){
                     it.recycle()
-                    overlayBitmap = OverlayItem.createOverlayBitmap(overlayItems, outputWidth, outputHeight)
+                    overlayBitmap = OverlayItem.createOverlayBitmap(overlayItems, inputWidth, inputHeight)
                 }
             }
         }
