@@ -1,12 +1,14 @@
 package com.isaacudy.kfilter.filters
 
+import android.opengl.GLES20
 import com.isaacudy.kfilter.Kfilter
 
-internal class SimpleKfilter internal constructor(val transforms: List<SimpleKfilterTransform>): Kfilter(){
+internal class SimpleKfilter internal constructor(val transforms: List<SimpleKfilterTransform>) : Kfilter() {
+
     override fun getShader(): String {
         return """
             #extension GL_OES_EGL_image_external : require
-            precision mediump float;
+            precision highp float;
             varying vec2 textureCoord;
             uniform samplerExternalOES externalTexture;
 
@@ -34,26 +36,33 @@ internal class SimpleKfilter internal constructor(val transforms: List<SimpleKfi
                 return satColor;
             }
 
-            vec3 overlayBlender(vec3 Color, vec3 filter){
+            vec3 overlayBlender(vec3 color, vec3 filter){
                 vec3 filter_result;
                 float luminance = dot(filter, W);
                 if(luminance < 0.5)
-                    filter_result = 2. * filter * Color;
+                    filter_result = 2. * filter * color;
                 else
-                    filter_result = 1. - (1. - (2. *(filter - 0.5)))*(1. - Color);
+                    filter_result = 1. - (1. - (2. *(filter - 0.5)))*(1. - color);
                 return filter_result;
             }
 
-            vec3 multiplyBlender(vec3 Color, vec3 filter){
+            vec3 multiplyBlender(vec3 color, vec3 filter){
                 vec3 filter_result;
                 float luminance = dot(filter, W);
 
                 if(luminance < 0.5)
-                    filter_result = 2. * filter * Color;
+                    filter_result = 2. * filter * color;
                 else
-                    filter_result = Color;
+                    filter_result = color;
 
                 return filter_result;
+            }
+
+            vec3 vignette(vec3 color, float radius, float softness, float intensity){
+                vec2 position = textureCoord.xy - vec2(0.5, 0.5);
+                float len = length(position);
+                float vignette = smoothstep(radius, radius - softness, len);
+                return mix(color, color * vignette, intensity);
             }
 
             void main(){
@@ -71,7 +80,7 @@ internal class SimpleKfilter internal constructor(val transforms: List<SimpleKfi
 
     private fun processTransforms(): String {
         var output = ""
-        for (transform in transforms){
+        for (transform in transforms) {
             output += transform.getShaderCode() + "\n"
         }
         return output
@@ -84,40 +93,50 @@ sealed class SimpleKfilterTransform {
     abstract fun getShaderCode(): String
 }
 
-class BrightnessTransform(val brightness: Float): SimpleKfilterTransform(){
+class BrightnessTransform(val brightness: Float) : SimpleKfilterTransform() {
     override fun getShaderCode(): String {
         return "color = brightness(color, ${brightness.format(5)});"
     }
 }
 
-class ContrastTransform(val contrast: Float): SimpleKfilterTransform(){
+class ContrastTransform(val contrast: Float) : SimpleKfilterTransform() {
     override fun getShaderCode(): String {
         return "color = contrast(color, ${contrast.format(5)});"
     }
 }
 
-class SaturationTransform(val saturation: Float): SimpleKfilterTransform(){
+class SaturationTransform(val saturation: Float) : SimpleKfilterTransform() {
     override fun getShaderCode(): String {
         return "color = saturation(color, ${saturation.format(5)});"
     }
 }
 
+class VignetteTransform(val radius: Float, val softness: Float, val intesity: Float) : SimpleKfilterTransform() {
+    override fun getShaderCode(): String {
+        return "color = vignette(color, ${radius.format(5)}, ${softness.format(5)}, ${intesity.format(5)});"
+    }
+}
 
 class SimpleKfilterBuilder {
     private val transforms: MutableList<SimpleKfilterTransform> = ArrayList()
 
-    fun brightness(brightness: Float): SimpleKfilterBuilder{
+    fun brightness(brightness: Float): SimpleKfilterBuilder {
         transforms.add(BrightnessTransform(brightness))
         return this
     }
 
-    fun contrast(contrast: Float): SimpleKfilterBuilder{
+    fun contrast(contrast: Float): SimpleKfilterBuilder {
         transforms.add(ContrastTransform(contrast))
         return this
     }
 
-    fun saturation(saturation: Float): SimpleKfilterBuilder{
+    fun saturation(saturation: Float): SimpleKfilterBuilder {
         transforms.add(SaturationTransform(saturation))
+        return this
+    }
+
+    fun vingette(radius: Float = 0.75f, softness: Float = 0.45f, intesity: Float = 0.5f): SimpleKfilterBuilder {
+        transforms.add(VignetteTransform(radius, softness, intesity))
         return this
     }
 

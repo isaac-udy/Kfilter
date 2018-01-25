@@ -67,8 +67,8 @@ internal class OutputSurface(kfilter: Kfilter, initEgl: Boolean = false) : Surfa
     private var frameAvailable: Boolean = false
     private var textureRender: KfilterRenderer? = null
 
-    private val width: Int = kfilter.outputWidth
-    private val height: Int = kfilter.outputHeight
+    private val width: Int = kfilter.inputWidth
+    private val height: Int = kfilter.inputHeight
 
     /**
      * Creates an OutputSurface backed by a pbuffer with the specifed dimensions.  The new

@@ -90,6 +90,10 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
         return true
     }
 
+
+    private var aspectAdjustedWidth: Int = 0
+    private var aspectAdjustedHeight: Int = 0
+
     private fun adjustViewport() {
         val surfaceAspect = height / width.toFloat()
         val videoAspect = mediaHeight / mediaWidth.toFloat()
@@ -101,11 +105,17 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
             val newWidth = (height / videoAspect).toInt()
             val xOffset = Math.abs(width - newWidth) / 2
             GLES20.glViewport(xOffset, 0, width - xOffset * 2, height)
+
+            aspectAdjustedWidth = newWidth
+            aspectAdjustedHeight = height
         }
         else {
             val newHeight = (width * videoAspect).toInt()
             val yOffset = Math.abs(height - newHeight) / 2
             GLES20.glViewport(0, yOffset, width, height - yOffset * 2)
+
+            aspectAdjustedWidth = width
+            aspectAdjustedHeight = newHeight
         }
         adjustViewport = false
         mediaTexture?.apply { setDefaultBufferSize(mediaWidth, mediaHeight) }

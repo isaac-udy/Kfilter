@@ -76,11 +76,11 @@ internal class KfilterRenderer(val kfilter: Kfilter) {
     private var positionHandle: Int = 0
     private var textureHandle: Int = 0
 
-    private var inputWidth: Int = kfilter.outputWidth
-    private var inputHeight: Int = kfilter.outputHeight
+    private var inputWidth: Int = kfilter.inputWidth
+    private var inputHeight: Int = kfilter.inputHeight
 
-    private var targetWidth: Int = kfilter.outputWidth
-    private var targetHeight: Int = kfilter.outputHeight
+    private var targetWidth: Int = kfilter.inputWidth
+    private var targetHeight: Int = kfilter.inputHeight
 
     var initialised: Boolean = false
         private set
@@ -125,7 +125,7 @@ internal class KfilterRenderer(val kfilter: Kfilter) {
             throw RuntimeException("Could not get attrib location for surfaceMatrix")
         }
 
-        kfilter.resize(inputWidth, inputHeight)
+        kfilter.resize(inputWidth, inputHeight, targetWidth, targetHeight)
         kfilter.initialise(program)
 
         initialised = true
@@ -180,6 +180,7 @@ internal class KfilterRenderer(val kfilter: Kfilter) {
     fun setDimensions(inputWidth: Int, inputHeight: Int, targetWidth: Int, targetHeight: Int) {
         this.inputWidth = inputWidth
         this.inputHeight = inputHeight
+
         this.targetWidth = targetWidth
         this.targetHeight = targetHeight
     }
