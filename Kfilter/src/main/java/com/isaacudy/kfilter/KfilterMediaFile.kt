@@ -4,6 +4,7 @@ import android.graphics.BitmapFactory
 import android.media.ExifInterface
 import android.media.MediaMetadataRetriever
 import android.webkit.MimeTypeMap
+import com.isaacudy.kfilter.utils.getBitmapDownscaling
 import java.io.FileInputStream
 import java.io.IOException
 
@@ -85,6 +86,10 @@ internal class KfilterMediaFile(val path: String) {
                 mediaWidth = options.outWidth
                 mediaHeight = options.outHeight
             }
+
+            val imageScaling = getBitmapDownscaling(mediaWidth, mediaHeight)
+            mediaWidth /= imageScaling
+            mediaHeight /= imageScaling
 
             when(orientation){
                 ExifInterface.ORIENTATION_NORMAL -> imageOrientation = 0
