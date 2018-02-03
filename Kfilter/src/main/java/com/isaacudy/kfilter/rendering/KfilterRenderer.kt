@@ -92,7 +92,7 @@ internal class KfilterRenderer(val kfilter: Kfilter) {
      * Initializes GL state.  Call this after the EGL surface has been created and made current.
      */
     fun initialise() {
-        if(initialised){
+        if (initialised) {
             release()
         }
 

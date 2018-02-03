@@ -4,6 +4,7 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.SurfaceTexture
 import android.media.MediaPlayer
+import android.os.Handler
 import android.util.AttributeSet
 import android.util.Log
 import android.view.GestureDetector
@@ -23,6 +24,7 @@ const val ERROR_NO_ERROR = 0
 const val ERROR_TIMEOUT = 1
 const val ERROR_MEDIA_PLAYER_CONFIGURE = 2
 const val ERROR_SAVE = 3
+const val ERROR_UNKNOWN_MEDIA_TYPE = 4
 
 class KfilterView @JvmOverloads constructor(context: Context,
                                             attrs: AttributeSet? = null,
@@ -37,7 +39,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
                 mediaPlayer?.let(field)
             }
         }
-    var onErrorListener: (errorCode: Int) -> Unit = {}
+    var onErrorListener: (errorCode: Int) -> Unit = { Log.e("KfilterView", "ERROR: $it") }
     private var lastError = ERROR_NO_ERROR
 
     private val gestureDetector = GestureDetector(context, GestureListener())
@@ -196,11 +198,10 @@ class KfilterView @JvmOverloads constructor(context: Context,
 
             val mediaType = contentFile?.mediaType ?: MediaType.NONE
 
-            if (mediaType === MediaType.IMAGE) {
-                openImageContent()
-            }
-            else if (mediaType == MediaType.VIDEO) {
-                openVideoContent()
+            when(mediaType) {
+                MediaType.IMAGE -> openImageContent()
+                MediaType.VIDEO -> openVideoContent()
+                else -> triggerError(ERROR_UNKNOWN_MEDIA_TYPE)
             }
         }
     }
@@ -232,6 +233,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
     }
 
     private fun releaseRenderingResources() {
+        kfilters.forEach { it.release() }
         mediaRenderer?.release()
         mediaRenderer = null
 
@@ -247,12 +249,13 @@ class KfilterView @JvmOverloads constructor(context: Context,
 
         surface?.apply { release() }
         surface = null
+
+        externalTexture.release()
     }
 
     private fun openVideoContent() {
         try {
             mediaPlayer = MediaPlayer().apply {
-                setOnPreparedListener(onPreparedListener)
                 setDataSource(contentFile!!.path)
                 setSurface(surface)
                 isLooping = true
@@ -263,9 +266,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
                 prepareAsync()
             }
             mediaPlayer?.let { mediaPlayer ->
-                mediaRenderer?.let { mediaRenderer ->
-                    renderThread = VideoRenderThread(mediaRenderer, mediaPlayer).apply { start() }
-                }
+                renderThread = VideoRenderThread(mediaPlayer).apply { start() }
             }
         }
         catch (e: IOException) {
@@ -293,9 +294,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
             bitmap.recycle()
         }
 
-        mediaRenderer?.let { mediaRenderer ->
-            renderThread = RenderThread(mediaRenderer).apply { start() }
-        }
+        renderThread = RenderThread().apply { start() }
     }
     //endregion
 
@@ -305,6 +304,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
         surfaceHeight = height
         texture = st
         openContent()
+        Log.e("TEX A", "$st")
     }
 
     override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, width: Int, height: Int) {
@@ -315,15 +315,16 @@ class KfilterView @JvmOverloads constructor(context: Context,
     }
 
     override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
-        kfilters.forEach { it.release() }
         releaseRenderingResources()
         return false
     }
 
-    override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
+    override fun onSurfaceTextureUpdated(st: SurfaceTexture) {
+        Log.e("TEX UP", "$st")
+    }
     //endregion
 
-    private inner open class RenderThread(val mediaRenderer: KfilterMediaRenderer) : Thread() {
+    private inner open class RenderThread : Thread() {
 
         internal var running = false
 
@@ -339,20 +340,21 @@ class KfilterView @JvmOverloads constructor(context: Context,
 
             while (synchronized(this) { running }) {
                 onRender()
-
                 // don't re-render the image unless the kfilterOffset has changed since last time
-                if (lastRenderedPosition != this@KfilterView.kfilterOffset) {
-                    synchronized(mediaRenderer) {
-                        try {
-                            mediaRenderer.apply {
-                                mediaRenderer.mediaTexture?.let {
-                                    onFrameAvailable(it)
+                if (lastRenderedPosition != kfilterOffset) {
+                    mediaRenderer?.let { mediaRenderer ->
+                        synchronized(mediaRenderer) {
+                            try {
+                                mediaRenderer.apply {
+                                    mediaRenderer.mediaTexture?.let {
+                                        onFrameAvailable(it)
+                                    }
                                 }
+                                lastRenderedPosition = kfilterOffset
                             }
-                            lastRenderedPosition = this@KfilterView.kfilterOffset
-                        }
-                        catch (ex: Exception) {
-                            running = false
+                            catch (ex: Exception) {
+                                running = false
+                            }
                         }
                     }
                 }
@@ -378,7 +380,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
      * Without triggering manual rendering of the video through KfilterMediaRenderer.onFrameAvailable,
      * the video will pause, but the live preview of filters will also stop, which is not ideal.
      */
-    private inner class VideoRenderThread(mediaRenderer: KfilterMediaRenderer, val mediaPlayer: MediaPlayer) : RenderThread(mediaRenderer) {
+    private inner class VideoRenderThread(val mediaPlayer: MediaPlayer) : RenderThread() {
         override fun onRender() {
             try {
                 while (mediaPlayer.isPlaying) {
