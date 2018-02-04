@@ -2,6 +2,7 @@ package com.isaacudy.kfilter
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.SurfaceTexture
 import android.media.MediaPlayer
 import android.util.AttributeSet
@@ -23,6 +24,7 @@ const val ERROR_NO_ERROR = 0
 const val ERROR_TIMEOUT = 1
 const val ERROR_MEDIA_PLAYER_CONFIGURE = 2
 const val ERROR_SAVE = 3
+const val ERROR_UNKNOWN_MEDIA_TYPE = 4
 
 class KfilterView @JvmOverloads constructor(context: Context,
                                             attrs: AttributeSet? = null,
@@ -37,7 +39,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
                 mediaPlayer?.let(field)
             }
         }
-    var onErrorListener: (errorCode: Int) -> Unit = {}
+    var onErrorListener: (errorCode: Int) -> Unit = { Log.e("KfilterView", "ERROR: $it") }
     private var lastError = ERROR_NO_ERROR
 
     private val gestureDetector = GestureDetector(context, GestureListener())
@@ -75,6 +77,12 @@ class KfilterView @JvmOverloads constructor(context: Context,
 
     init {
         surfaceTextureListener = this
+
+        onPreparedListener = { mediaPlayer ->
+            mediaPlayer.isLooping = true
+            mediaPlayer.seekTo(0)
+            mediaPlayer.start()
+        }
     }
 
     fun setContentPath(path: String) {
@@ -196,11 +204,10 @@ class KfilterView @JvmOverloads constructor(context: Context,
 
             val mediaType = contentFile?.mediaType ?: MediaType.NONE
 
-            if (mediaType === MediaType.IMAGE) {
-                openImageContent()
-            }
-            else if (mediaType == MediaType.VIDEO) {
-                openVideoContent()
+            when (mediaType) {
+                MediaType.IMAGE -> openImageContent()
+                MediaType.VIDEO -> openVideoContent()
+                else -> triggerError(ERROR_UNKNOWN_MEDIA_TYPE)
             }
         }
     }
@@ -232,6 +239,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
     }
 
     private fun releaseRenderingResources() {
+        kfilters.forEach { it.release() }
         mediaRenderer?.release()
         mediaRenderer = null
 
@@ -247,12 +255,13 @@ class KfilterView @JvmOverloads constructor(context: Context,
 
         surface?.apply { release() }
         surface = null
+
+        externalTexture.release()
     }
 
     private fun openVideoContent() {
         try {
             mediaPlayer = MediaPlayer().apply {
-                setOnPreparedListener(onPreparedListener)
                 setDataSource(contentFile!!.path)
                 setSurface(surface)
                 isLooping = true
@@ -262,11 +271,8 @@ class KfilterView @JvmOverloads constructor(context: Context,
                 }
                 prepareAsync()
             }
-            mediaPlayer?.let { mediaPlayer ->
-                mediaRenderer?.let { mediaRenderer ->
-                    renderThread = VideoRenderThread(mediaRenderer, mediaPlayer).apply { start() }
-                }
-            }
+
+            renderThread = VideoRenderThread().apply { start() }
         }
         catch (e: IOException) {
             e.printStackTrace()
@@ -275,27 +281,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
     }
 
     private fun openImageContent() {
-        val bitmap = loadBitmap(contentFile ?: return)
-        try {
-            surface?.apply {
-                val canvas = lockCanvas(null)
-                canvas.drawARGB(255, 0, 0, 0)
-                canvas.drawBitmap(bitmap, 0f, 0f, null)
-                unlockCanvasAndPost(canvas)
-            }
-        }
-        catch (ex: Exception) {
-            // it's possible for the surface to become invalid, and cause a crash here
-            // if that happens, just return
-            return
-        }
-        finally {
-            bitmap.recycle()
-        }
-
-        mediaRenderer?.let { mediaRenderer ->
-            renderThread = RenderThread(mediaRenderer).apply { start() }
-        }
+        renderThread = ImageRenderThread().apply { start() }
     }
     //endregion
 
@@ -315,15 +301,15 @@ class KfilterView @JvmOverloads constructor(context: Context,
     }
 
     override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
-        kfilters.forEach { it.release() }
         releaseRenderingResources()
         return false
     }
 
-    override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
+    override fun onSurfaceTextureUpdated(st: SurfaceTexture) {
+    }
     //endregion
 
-    private inner open class RenderThread(val mediaRenderer: KfilterMediaRenderer) : Thread() {
+    private inner open class RenderThread : Thread() {
 
         internal var running = false
 
@@ -338,21 +324,23 @@ class KfilterView @JvmOverloads constructor(context: Context,
             var lastRenderedPosition = -1f
 
             while (synchronized(this) { running }) {
-                onRender()
-
+                onPreRender()
                 // don't re-render the image unless the kfilterOffset has changed since last time
-                if (lastRenderedPosition != this@KfilterView.kfilterOffset) {
-                    synchronized(mediaRenderer) {
-                        try {
-                            mediaRenderer.apply {
-                                mediaRenderer.mediaTexture?.let {
-                                    onFrameAvailable(it)
+                if (lastRenderedPosition != kfilterOffset) {
+                    mediaRenderer?.let { mediaRenderer ->
+                        synchronized(mediaRenderer) {
+                            try {
+                                onRender()
+                                mediaRenderer.apply {
+                                    mediaRenderer.mediaTexture?.let {
+                                        onFrameAvailable(it)
+                                    }
                                 }
+                                lastRenderedPosition = kfilterOffset
                             }
-                            lastRenderedPosition = this@KfilterView.kfilterOffset
-                        }
-                        catch (ex: Exception) {
-                            running = false
+                            catch (ex: Exception) {
+                                running = false
+                            }
                         }
                     }
                 }
@@ -367,6 +355,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
             onRelease()
         }
 
+        open fun onPreRender() {}
         open fun onRender() {}
         open fun onRelease() {}
     }
@@ -378,10 +367,10 @@ class KfilterView @JvmOverloads constructor(context: Context,
      * Without triggering manual rendering of the video through KfilterMediaRenderer.onFrameAvailable,
      * the video will pause, but the live preview of filters will also stop, which is not ideal.
      */
-    private inner class VideoRenderThread(mediaRenderer: KfilterMediaRenderer, val mediaPlayer: MediaPlayer) : RenderThread(mediaRenderer) {
-        override fun onRender() {
+    private inner class VideoRenderThread : RenderThread() {
+        override fun onPreRender() {
             try {
-                while (mediaPlayer.isPlaying) {
+                while (mediaPlayer?.isPlaying == true) {
                     Thread.sleep(66)
                 }
             }
@@ -390,6 +379,27 @@ class KfilterView @JvmOverloads constructor(context: Context,
                 // so we stop running
                 running = false
             }
+        }
+    }
+
+    private inner class ImageRenderThread : RenderThread() {
+        lateinit var bitmap: Bitmap
+
+        init {
+            contentFile?.let { bitmap = loadBitmap(it) }
+        }
+
+        override fun onRender() {
+            surface?.apply {
+                val canvas = lockCanvas(null)
+                canvas.drawARGB(255, 0, 0, 0)
+                canvas.drawBitmap(bitmap, 0f, 0f, null)
+                unlockCanvasAndPost(canvas)
+            }
+        }
+
+        override fun onRelease() {
+            bitmap.recycle()
         }
     }
 

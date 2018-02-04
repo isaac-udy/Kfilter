@@ -2,6 +2,8 @@
 
 Kfilter is a small image processing library. Kfilter aims to provide a simple interface to create photo and video filters as you would find in applications such as Snapchat or Instagram. 
 
+![Example GIF](.resources/kfilter_sample_1.gif)
+
 ### Why use Kfilter?
 
 * One filter system that works for both photos and videos
@@ -33,7 +35,7 @@ allprojects {
 ```
 ```
 dependencies {
-	compile 'com.github.isaac-udy:Kfilter:1.0.1'
+	compile 'com.github.isaac-udy:Kfilter:1.0.2'
 }
 ```
 

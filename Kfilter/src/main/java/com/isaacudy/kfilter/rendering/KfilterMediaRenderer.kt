@@ -8,6 +8,7 @@ package com.isaacudy.kfilter.rendering
 
 import android.graphics.SurfaceTexture
 import android.opengl.GLES20
+import android.util.Log
 
 import com.isaacudy.kfilter.utils.ExternalTexture
 import com.isaacudy.kfilter.Kfilter
@@ -90,7 +91,6 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
         return true
     }
 
-
     private var aspectAdjustedWidth: Int = 0
     private var aspectAdjustedHeight: Int = 0
 
@@ -152,18 +152,8 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
         adjustViewport = true
     }
 
-    fun setKfilter(kfilter: Kfilter) {
-        if(this.kfilter?.kfilter === kfilter){
-            return
-        }
-
-        queuedPrimaryKfilter = KfilterRenderer(kfilter).apply {
-            setDimensions(mediaWidth, mediaHeight, width, height)
-        }
-    }
-
-    fun setKfilter(kfilter: Kfilter, secondaryKfilter: Kfilter?) {
-        if(this.kfilter?.kfilter === kfilter && this.secondaryKfilter?.kfilter === secondaryKfilter){
+    fun setKfilter(kfilter: Kfilter, secondaryKfilter: Kfilter? = null) {
+        if(this.kfilter?.kfilter === kfilter && this.secondaryKfilter?.kfilter === secondaryKfilter) {
             return
         }
 
@@ -177,8 +167,20 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
             }
         }
         else {
-            setKfilter(kfilter)
-            secondaryKfilter?.let { setSecondaryKfilter(it) }
+            setPrimaryKfilter(kfilter)
+            if(kfilter !== secondaryKfilter) {
+                secondaryKfilter?.let { setSecondaryKfilter(it) }
+            }
+        }
+    }
+
+    private fun setPrimaryKfilter(kfilter: Kfilter) {
+        if(this.kfilter?.kfilter === kfilter){
+            return
+        }
+
+        queuedPrimaryKfilter = KfilterRenderer(kfilter).apply {
+            setDimensions(mediaWidth, mediaHeight, width, height)
         }
     }
 
