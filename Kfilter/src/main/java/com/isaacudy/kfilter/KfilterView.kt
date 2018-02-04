@@ -291,7 +291,6 @@ class KfilterView @JvmOverloads constructor(context: Context,
         surfaceHeight = height
         texture = st
         openContent()
-        Log.e("TEX A", "$st")
     }
 
     override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, width: Int, height: Int) {
@@ -307,7 +306,6 @@ class KfilterView @JvmOverloads constructor(context: Context,
     }
 
     override fun onSurfaceTextureUpdated(st: SurfaceTexture) {
-        Log.e("TEX UP", "$st")
     }
     //endregion
 
