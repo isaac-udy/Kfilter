@@ -73,11 +73,6 @@ class MainActivity : AppCompatActivity() {
             getUriPath(this, data.data)?.let{
                 kfilterView.setContentPath(it)
             }
-            kfilterView.onPreparedListener = { mediaPlayer ->
-                mediaPlayer.isLooping = true
-                mediaPlayer.seekTo(0)
-                mediaPlayer.start()
-            }
         }
     }
 }
