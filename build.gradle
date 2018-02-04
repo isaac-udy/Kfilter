@@ -6,8 +6,8 @@ buildscript {
     ext.android_version_min = 21
     ext.android_version_target = 26
 
-    ext.library_version_name = "1.0.1"
-    ext.library_version_code = 2
+    ext.library_version_name = "1.0.2"
+    ext.library_version_code = 3
 
     repositories {
         google()
