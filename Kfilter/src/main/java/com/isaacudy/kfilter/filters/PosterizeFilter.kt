@@ -15,7 +15,7 @@ class PosterizeFilter(val colourCount: Int = 4) : Kfilter() {
                 float outputRed =   float(int(color.r * $colourCount.0)) / $colourCount.0;
                 float outputGreen = float(int(color.g * $colourCount.0)) / $colourCount.0;
                 float outputBlue =  float(int(color.b * $colourCount.0)) / $colourCount.0;
-                gl_FragColor = vec4(outputRed, outputGreen, outputBlue, 1);
+                gl_FragColor = vec4(outputRed, outputGreen, outputBlue, 1.0);
             }
         """
     }

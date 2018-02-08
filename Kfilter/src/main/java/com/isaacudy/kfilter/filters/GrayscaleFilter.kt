@@ -12,8 +12,8 @@ class GrayscaleFilter : Kfilter() {
             uniform samplerExternalOES externalTexture;
             void main() {
                 vec4 color = texture2D(externalTexture, textureCoord);
-                float avg = (color.r + color.b + color.g) / 3.0f;
-                gl_FragColor = vec4(avg, avg, avg, 1);
+                float avg = (color.r + color.b + color.g) / 3.0;
+                gl_FragColor = vec4(avg, avg, avg, 1.0);
             }
         """
     }

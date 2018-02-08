@@ -370,6 +370,9 @@ class KfilterView @JvmOverloads constructor(context: Context,
     private inner class VideoRenderThread : RenderThread() {
         override fun onPreRender() {
             try {
+                if(mediaPlayer == null){
+                    running = false
+                }
                 while (mediaPlayer?.isPlaying == true) {
                     Thread.sleep(66)
                 }
