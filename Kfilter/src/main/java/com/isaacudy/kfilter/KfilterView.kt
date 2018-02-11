@@ -144,6 +144,9 @@ class KfilterView @JvmOverloads constructor(context: Context,
             secondary = Math.ceil(kfilterOffset.toDouble()).toInt()
         }
 
+        if(primary < 0) primary = 0
+        if(secondary < 0) secondary = 0
+
         mediaRenderer?.apply {
             var primaryKfilter: Kfilter = BaseKfilter()
             if(kfilters.size > primary){
