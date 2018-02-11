@@ -144,8 +144,21 @@ class KfilterView @JvmOverloads constructor(context: Context,
             secondary = Math.ceil(kfilterOffset.toDouble()).toInt()
         }
 
+        if(primary < 0) primary = 0
+        if(secondary < 0) secondary = 0
+
         mediaRenderer?.apply {
-            setKfilter(kfilters[primary], kfilters[secondary])
+            var primaryKfilter: Kfilter = BaseKfilter()
+            if(kfilters.size > primary){
+                primaryKfilter = kfilters[primary]
+            }
+
+            var secondaryKfilter: Kfilter = BaseKfilter()
+            if(kfilters.size > primary){
+                secondaryKfilter = kfilters[secondary]
+            }
+
+            setKfilter(primaryKfilter, secondaryKfilter)
             filterOffset = (selectedKfilter - kfilterOffset)
         }
     }
