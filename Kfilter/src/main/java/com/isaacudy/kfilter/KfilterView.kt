@@ -138,7 +138,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
     }
 
     private fun applyKfilterOffset() {
-        val primary = selectedKfilter
+        var primary = selectedKfilter
         var secondary = Math.floor(kfilterOffset.toDouble()).toInt()
         if (primary == secondary) {
             secondary = Math.ceil(kfilterOffset.toDouble()).toInt()
