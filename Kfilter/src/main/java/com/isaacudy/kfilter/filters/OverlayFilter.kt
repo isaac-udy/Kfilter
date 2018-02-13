@@ -10,12 +10,7 @@ import java.lang.IllegalStateException
 import java.lang.RuntimeException
 import java.nio.IntBuffer
 
-
-/**
- * Created by IsaacUdy on 8/06/2017.
- */
-
-open class OverlayFilter(internal val overlayItems: List<OverlayItem>) : Kfilter() {
+open class OverlayFilter(internal val overlayItems: List<OverlayItem> = listOf()) : Kfilter() {
     internal val TAG = "OverlayFilter"
 
     override fun getShader(): String {
@@ -94,9 +89,11 @@ open class OverlayFilter(internal val overlayItems: List<OverlayItem>) : Kfilter
     }
 }
 
-data class OverlayItem(val bitmapLocation: String, val position: Long, val size: Float = 0.2f, val index: Int = 0) {
+data class OverlayItem(val bitmapLocation: String, val position: Long = OVERLAY, val size: Float = 0.2f, val index: Int = 0) {
 
     var bitmap: Bitmap? = null
+
+    private constructor(): this("")
 
     companion object {
         const val TAG = "OverlayItem"
