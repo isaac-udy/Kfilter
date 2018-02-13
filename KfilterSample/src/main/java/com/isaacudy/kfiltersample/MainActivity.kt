@@ -63,7 +63,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         saveOutputButton.setOnClickListener {
-            kfilterView.save("storage/emulated/0/Download/test.png")
+            kfilterView.getProcessor()?.save("storage/emulated/0/Download/test.png")
         }
     }
 
