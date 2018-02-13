@@ -104,16 +104,12 @@ class KfilterView @JvmOverloads constructor(context: Context,
         selectedKfilter = 0
     }
 
-    fun save(savePath: String) {
+    fun getProcessor() : KfilterProcessor? {
         contentFile?.let {
             val selected = kfilters[selectedKfilter]
-            val processor = KfilterProcessor(selected, it.path)
-            processor.onError = {
-                Log.e("KfilterView", "KfilterProcessor encountered an error", it)
-                triggerError(ERROR_SAVE)
-            }
-            processor.save(savePath)
+            return KfilterProcessor(selected, it.path)
         }
+        return null
     }
 
     @JvmOverloads
