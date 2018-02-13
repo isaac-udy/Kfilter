@@ -46,9 +46,14 @@ class KfilterView @JvmOverloads constructor(context: Context,
     var gesturesEnabled = true
 
     private val kfilters = ArrayList<Kfilter>()
+
     private var contentFile: KfilterMediaFile? = null
+    val contentPath: String?
+        get() = contentFile?.path
+
     private var renderThread: RenderThread? = null
-    private var mediaPlayer: MediaPlayer? = null
+    var mediaPlayer: MediaPlayer? = null
+        private set
     private var isPrepared: Boolean = false
 
     private val externalTexture = ExternalTexture()
