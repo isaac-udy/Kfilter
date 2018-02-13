@@ -3,7 +3,7 @@ package com.isaacudy.kfilter.filters
 import android.opengl.GLES20
 import com.isaacudy.kfilter.Kfilter
 
-internal class SimpleKfilter internal constructor(val transforms: List<SimpleKfilterTransform>) : Kfilter() {
+internal class SimpleKfilter internal constructor(val transforms: List<SimpleKfilterTransform> = listOf()) : Kfilter() {
 
     override fun getShader(): String {
         return """
@@ -93,25 +93,25 @@ sealed class SimpleKfilterTransform {
     abstract fun getShaderCode(): String
 }
 
-class BrightnessTransform(val brightness: Float) : SimpleKfilterTransform() {
+class BrightnessTransform(val brightness: Float = 0f) : SimpleKfilterTransform() {
     override fun getShaderCode(): String {
         return "color = brightness(color, ${brightness.format(5)});"
     }
 }
 
-class ContrastTransform(val contrast: Float) : SimpleKfilterTransform() {
+class ContrastTransform(val contrast: Float = 0f) : SimpleKfilterTransform() {
     override fun getShaderCode(): String {
         return "color = contrast(color, ${contrast.format(5)});"
     }
 }
 
-class SaturationTransform(val saturation: Float) : SimpleKfilterTransform() {
+class SaturationTransform(val saturation: Float = 0f) : SimpleKfilterTransform() {
     override fun getShaderCode(): String {
         return "color = saturation(color, ${saturation.format(5)});"
     }
 }
 
-class VignetteTransform(val radius: Float, val softness: Float, val intesity: Float) : SimpleKfilterTransform() {
+class VignetteTransform(val radius: Float = 0.75f, val softness: Float = 0.45f, val intesity: Float = 0.5f) : SimpleKfilterTransform() {
     override fun getShaderCode(): String {
         return "color = vignette(color, ${radius.format(5)}, ${softness.format(5)}, ${intesity.format(5)});"
     }

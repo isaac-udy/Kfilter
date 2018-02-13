@@ -2,9 +2,6 @@ package com.isaacudy.kfilter.filters
 
 import com.isaacudy.kfilter.Kfilter
 
-/**
- * Created by Isaac on 23/01/2018.
- */
 class WarmFilter : Kfilter() {
 
     override fun getShader(): String {
