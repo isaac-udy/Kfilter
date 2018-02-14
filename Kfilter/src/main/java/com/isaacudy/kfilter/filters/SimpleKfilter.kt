@@ -3,7 +3,7 @@ package com.isaacudy.kfilter.filters
 import android.opengl.GLES20
 import com.isaacudy.kfilter.Kfilter
 
-internal class SimpleKfilter internal constructor(val transforms: List<SimpleKfilterTransform> = listOf()) : Kfilter() {
+class SimpleKfilter internal constructor(val transforms: List<SimpleKfilterTransform> = listOf()) : Kfilter() {
 
     override fun getShader(): String {
         return """
