@@ -141,7 +141,7 @@ internal class OutputSurface(kfilter: Kfilter, initEgl: Boolean = false) : Surfa
             throw RuntimeException("unable to find RGB888+pbuffer EGL config")
         }
         // Configure context for OpenGL ES 2.0.
-        val contextAttributes = intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL10.EGL_NONE)
+        val contextAttributes = intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 3, EGL10.EGL_NONE)
         eglContext = egl!!.eglCreateContext(eglDisplay, configs[0], EGL10.EGL_NO_CONTEXT, contextAttributes)
         checkEglError("eglCreateContext")
         if (eglContext == null) {
@@ -192,7 +192,12 @@ internal class OutputSurface(kfilter: Kfilter, initEgl: Boolean = false) : Surfa
         if (egl == null) {
             throw RuntimeException("not configured for makeCurrent")
         }
-        checkEglError("before makeCurrent")
+        try {
+            checkEglError("before makeCurrent")
+        }
+        catch (e: Exception){
+            // Pass here, and attempt to make current anyway. If that fails, we'll crash.
+        }
         if (!egl!!.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
             throw RuntimeException("eglMakeCurrent failed")
         }
