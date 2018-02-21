@@ -134,7 +134,7 @@ internal abstract class TextureSurfaceRenderer(private val texture: SurfaceTextu
     }
 
     private fun createContext(egl: EGL10, eglDisplay: EGLDisplay?, eglConfig: EGLConfig?): EGLContext {
-        val attributes = intArrayOf(EGL_CONTEXT_CLIENT_VERSION, 2, EGL10.EGL_NONE)
+        val attributes = intArrayOf(EGL_CONTEXT_CLIENT_VERSION, 3, EGL10.EGL_NONE)
         return egl.eglCreateContext(eglDisplay, eglConfig, EGL10.EGL_NO_CONTEXT, attributes)
     }
 
