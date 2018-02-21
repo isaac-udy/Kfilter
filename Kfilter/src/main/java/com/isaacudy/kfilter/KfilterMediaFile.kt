@@ -21,7 +21,7 @@ internal class KfilterMediaFile(val path: String) {
     var error = MediaError.NONE
         private set
 
-    var imageOrientation = 0
+    var orientation = 0
         private set
 
     init {
@@ -63,8 +63,16 @@ internal class KfilterMediaFile(val path: String) {
 
         val widthString = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
         val heightString = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
-        mediaWidth = widthString.toInt()
-        mediaHeight = heightString.toInt()
+        val orientationString = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+        orientation = orientationString.toInt()
+        if(orientation == 0 || orientation == 180) {
+            mediaWidth = widthString.toInt()
+            mediaHeight = heightString.toInt()
+        }
+        else {
+            mediaWidth = heightString.toInt()
+            mediaHeight =  widthString.toInt()
+        }
 
         mediaType = MediaType.VIDEO
     }
@@ -92,10 +100,10 @@ internal class KfilterMediaFile(val path: String) {
             mediaHeight /= imageScaling
 
             when(orientation){
-                ExifInterface.ORIENTATION_NORMAL -> imageOrientation = 0
-                ExifInterface.ORIENTATION_ROTATE_90 -> imageOrientation = 90
-                ExifInterface.ORIENTATION_ROTATE_180 -> imageOrientation = 180
-                ExifInterface.ORIENTATION_ROTATE_270 -> imageOrientation = 270
+                ExifInterface.ORIENTATION_NORMAL -> this.orientation = 0
+                ExifInterface.ORIENTATION_ROTATE_90 -> this.orientation = 90
+                ExifInterface.ORIENTATION_ROTATE_180 -> this.orientation = 180
+                ExifInterface.ORIENTATION_ROTATE_270 -> this.orientation = 270
             }
         }
         else {

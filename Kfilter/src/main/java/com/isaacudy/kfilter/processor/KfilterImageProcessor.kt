@@ -49,7 +49,6 @@ internal class KfilterImageProcessor(val shader: Kfilter, val path: String, val 
             GLES20.glReadPixels(0, 0, width, height, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buffer)
             checkGlError("glReadPixels")
 
-            onProgress(0.10f)
             buffer.rewind()
             // Convert upside down mirror-reversed image to right-side up normal image.
             for (i in 0 until height) {
@@ -63,10 +62,8 @@ internal class KfilterImageProcessor(val shader: Kfilter, val path: String, val 
             try {
                 bos = BufferedOutputStream(FileOutputStream(pathOut))
                 val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                onProgress(0.20f)
                 bmp.copyPixelsFromBuffer(flippedBuffer)
                 bmp.compress(Bitmap.CompressFormat.PNG, 90, bos)
-                onProgress(0.95f)
                 bmp.recycle()
             }
             finally {

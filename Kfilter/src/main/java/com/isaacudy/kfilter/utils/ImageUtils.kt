@@ -22,9 +22,9 @@ internal fun loadBitmap(mediaFile: KfilterMediaFile): Bitmap {
     }
     var bitmap = BitmapFactory.decodeFile(mediaFile.path, options)
 
-    if (mediaFile.imageOrientation > 0) {
+    if (mediaFile.orientation > 0) {
         val matrix = Matrix()
-        matrix.postRotate(mediaFile.imageOrientation.toFloat())
+        matrix.postRotate(mediaFile.orientation.toFloat())
         bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 
