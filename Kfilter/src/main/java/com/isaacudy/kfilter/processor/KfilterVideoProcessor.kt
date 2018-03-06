@@ -531,10 +531,6 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                 videoFormat = videoExtractor.getTrackFormat(videoTrack).apply {
                     setInteger(MediaFormat.KEY_WIDTH, mediaFile.mediaWidth)
                     setInteger(MediaFormat.KEY_HEIGHT, mediaFile.mediaHeight)
-
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        setInteger(MediaFormat.KEY_ROTATION, 0)
-                    }
                 }
             }
             else {
