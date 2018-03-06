@@ -21,6 +21,7 @@ package com.isaacudy.kfilter.rendering
 import android.graphics.SurfaceTexture
 import android.opengl.GLES20
 import android.opengl.Matrix
+import android.util.Log
 
 import com.isaacudy.kfilter.Kfilter
 import com.isaacudy.kfilter.utils.*
@@ -131,7 +132,7 @@ internal class KfilterRenderer(val kfilter: Kfilter) {
         initialised = true
     }
 
-    fun draw(st: SurfaceTexture, scissorAmount: Float = 1f, offset: Boolean = false) {
+    fun draw(milliseconds: Long, st: SurfaceTexture, scissorAmount: Float = 1f, offset: Boolean = false) {
         if (!initialised) initialise()
 
         checkGlError("onDrawFrame start")
@@ -147,7 +148,7 @@ internal class KfilterRenderer(val kfilter: Kfilter) {
         GLES20.glUseProgram(program)
         checkGlError("glUseProgram")
 
-        kfilter.apply()
+        kfilter.apply(milliseconds)
         GLES20.glGetError() // It appears "apply" can sometimes cause erroneous errors
 
         triangleVertices.position(TRIANGLE_VERTICES_DATA_POS_OFFSET)

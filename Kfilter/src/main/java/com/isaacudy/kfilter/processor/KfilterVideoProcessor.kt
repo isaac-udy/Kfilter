@@ -1,17 +1,20 @@
 package com.isaacudy.kfilter.processor
 
 import android.media.*
+import android.os.Build
 import com.isaacudy.kfilter.rendering.InputSurface
 import com.isaacudy.kfilter.rendering.OutputSurface
 import android.util.Log
 import com.isaacudy.kfilter.Kfilter
+import com.isaacudy.kfilter.KfilterMediaFile
 import java.io.File
 
 private const val TAG = "KfilterVideoProcessor"
 private const val VERBOSE = true
 
-internal class KfilterVideoProcessor(val shader: Kfilter, val path: String, val pathOut: String) : KfilterProcessor.Delegate() {
+internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: KfilterMediaFile, val pathOut: String) : KfilterProcessor.Delegate() {
 
+    private val path = mediaFile.path
     private val extractor: Extractor
 
     init {
@@ -484,7 +487,7 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val path: String, val 
         return format
     }
 
-    internal class Extractor(val path: String) {
+    internal inner class Extractor(val path: String) {
         val VIDEO_TRACK_TYPE = "video/"
         val AUDIO_TRACK_TYPE = "audio/"
 
@@ -525,7 +528,14 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val path: String, val 
             videoTrack = getTrack(VIDEO_TRACK_TYPE)
             audioTrack = getTrack(AUDIO_TRACK_TYPE)
             if (hasVideoTrack) {
-                videoFormat = videoExtractor.getTrackFormat(videoTrack)
+                videoFormat = videoExtractor.getTrackFormat(videoTrack).apply {
+                    setInteger(MediaFormat.KEY_WIDTH, mediaFile.mediaWidth)
+                    setInteger(MediaFormat.KEY_HEIGHT, mediaFile.mediaHeight)
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        setInteger(MediaFormat.KEY_ROTATION, 0)
+                    }
+                }
             }
             else {
                 videoFormat = null

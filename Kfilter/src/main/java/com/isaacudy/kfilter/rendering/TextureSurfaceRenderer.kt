@@ -7,14 +7,14 @@
 package com.isaacudy.kfilter.rendering
 
 import android.graphics.SurfaceTexture
-import android.opengl.GLUtils
+import android.opengl.*
 import android.util.Log
 
-import javax.microedition.khronos.egl.EGL10
-import javax.microedition.khronos.egl.EGLConfig
-import javax.microedition.khronos.egl.EGLContext
-import javax.microedition.khronos.egl.EGLDisplay
-import javax.microedition.khronos.egl.EGLSurface
+//import javax.microedition.khronos.egl.EGL10
+//import javax.microedition.khronos.egl.EGLConfig
+//import javax.microedition.khronos.egl.EGLContext
+//import javax.microedition.khronos.egl.EGLDisplay
+//import javax.microedition.khronos.egl.EGLSurface
 
 private const val EGL_OPENGL_ES2_BIT = 4
 private const val EGL_CONTEXT_CLIENT_VERSION = 0x3098
@@ -32,7 +32,6 @@ private const val LOG_TAG = "SurfaceTest.GL"
  */
 internal abstract class TextureSurfaceRenderer(private val texture: SurfaceTexture, protected var width: Int, protected var height: Int) : Runnable {
 
-    private var egl: EGL10? = null
     private var eglDisplay: EGLDisplay? = null
     private var eglContext: EGLContext? = null
     private var eglSurface: EGLSurface? = null
@@ -43,13 +42,13 @@ internal abstract class TextureSurfaceRenderer(private val texture: SurfaceTextu
 
     private val config: IntArray
         get() = intArrayOf(
-                EGL10.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-                EGL10.EGL_SURFACE_TYPE, EGL10.EGL_PBUFFER_BIT,
-                EGL10.EGL_RED_SIZE, 8,
-                EGL10.EGL_GREEN_SIZE, 8,
-                EGL10.EGL_BLUE_SIZE, 8,
-                EGL10.EGL_ALPHA_SIZE, 8,
-                EGL10.EGL_NONE)
+            EGL14.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+            EGL14.EGL_SURFACE_TYPE, EGL14.EGL_PBUFFER_BIT,
+            EGL14.EGL_RED_SIZE, 8,
+            EGL14.EGL_GREEN_SIZE, 8,
+            EGL14.EGL_BLUE_SIZE, 8,
+            EGL14.EGL_ALPHA_SIZE, 8,
+            EGL14.EGL_NONE)
 
     init {
         this.running = true
@@ -65,7 +64,7 @@ internal abstract class TextureSurfaceRenderer(private val texture: SurfaceTextu
             val loopStart = System.currentTimeMillis()
 
             if (draw()) {
-                egl?.eglSwapBuffers(eglDisplay, eglSurface)
+                EGL14.eglSwapBuffers(eglDisplay, eglSurface)
             }
             val waitDelta = 16 - (System.currentTimeMillis() - loopStart)    // Targeting 60 fps, no need for faster
             if (waitDelta > 0) {
@@ -105,46 +104,43 @@ internal abstract class TextureSurfaceRenderer(private val texture: SurfaceTextu
     }
 
     private fun initGL() {
-        (EGLContext.getEGL() as EGL10).let {
-            egl = it
 
-            eglDisplay = it.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY)
-            val version = IntArray(2)
-            it.eglInitialize(eglDisplay, version)
-            val eglConfig = chooseEglConfig()
-            eglContext = createContext(it, eglDisplay, eglConfig)
-            eglSurface = it.eglCreateWindowSurface(eglDisplay, eglConfig, texture, null)
-            if (eglSurface == null || eglSurface == EGL10.EGL_NO_SURFACE) {
-                throw RuntimeException("GL Error: " + GLUtils.getEGLErrorString(it.eglGetError()))
-            }
-            if (!it.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
-                throw RuntimeException("GL Make current error: " + GLUtils.getEGLErrorString(it.eglGetError()))
-            }
+        eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
+        val version = IntArray(2)
+        EGL14.eglInitialize(eglDisplay, version, 0, version, 1)
+        val eglConfig = chooseEglConfig()
+        eglContext = createContext(eglDisplay, eglConfig)
 
+        val surfaceAttribs = intArrayOf(EGL14.EGL_NONE)
+        eglSurface = EGL14.eglCreateWindowSurface(eglDisplay, eglConfig, texture, surfaceAttribs, 0)
+        if (eglSurface == null || eglSurface == EGL14.EGL_NO_SURFACE) {
+            throw RuntimeException("GL Error: " + GLUtils.getEGLErrorString(EGL14.eglGetError()))
+        }
+        if (!EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
+            throw RuntimeException("GL Make current error: " + GLUtils.getEGLErrorString(EGL14.eglGetError()))
         }
     }
 
     private fun deinitGL() {
-        egl?.apply {
-            eglMakeCurrent(eglDisplay, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_CONTEXT)
-            eglDestroySurface(eglDisplay, eglSurface)
-            eglDestroyContext(eglDisplay, eglContext)
-            eglTerminate(eglDisplay)
-        }
+        EGL14.eglMakeCurrent(eglDisplay, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+        EGL14.eglDestroySurface(eglDisplay, eglSurface)
+        EGL14.eglDestroyContext(eglDisplay, eglContext)
+        EGL14.eglTerminate(eglDisplay)
+
     }
 
-    private fun createContext(egl: EGL10, eglDisplay: EGLDisplay?, eglConfig: EGLConfig?): EGLContext {
-        val attributes = intArrayOf(EGL_CONTEXT_CLIENT_VERSION, 3, EGL10.EGL_NONE)
-        return egl.eglCreateContext(eglDisplay, eglConfig, EGL10.EGL_NO_CONTEXT, attributes)
+    private fun createContext(eglDisplay: EGLDisplay?, eglConfig: EGLConfig?): EGLContext {
+        val attributes = intArrayOf(EGL_CONTEXT_CLIENT_VERSION, 3, EGL14.EGL_NONE)
+        return EGL14.eglCreateContext(eglDisplay, eglConfig, EGL14.EGL_NO_CONTEXT, attributes, 0)
     }
 
     private fun chooseEglConfig(): EGLConfig? {
         val configsCount = IntArray(1)
         val configs = arrayOfNulls<EGLConfig>(1)
-        val configSpec = config
-        val configChosen = egl?.eglChooseConfig(eglDisplay, configSpec, configs, 1, configsCount) ?: true
+        val attributes = config
+        val configChosen = EGL14.eglChooseConfig(eglDisplay, attributes, 0, configs, 0, configs.size, configsCount, 0)
         if (!configChosen) {
-            throw IllegalArgumentException("Failed to choose config: " + GLUtils.getEGLErrorString(egl?.eglGetError() ?: 0))
+            throw IllegalArgumentException("Failed to choose config: " + GLUtils.getEGLErrorString(EGL14.eglGetError()))
         }
         else if (configsCount[0] > 0) {
             return configs[0]

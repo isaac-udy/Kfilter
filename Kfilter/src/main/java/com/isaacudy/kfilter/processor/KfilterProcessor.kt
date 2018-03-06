@@ -35,10 +35,10 @@ class KfilterProcessor(kfilter: Kfilter, path: String) {
         }
 
         val delegate = if(mediaFile.mediaType == MediaType.IMAGE){
-            KfilterImageProcessor(kfilter, mediaFile.path, finalPath)
+            KfilterImageProcessor(kfilter, mediaFile, finalPath)
         }
         else {
-            KfilterVideoProcessor(kfilter, mediaFile.path, finalPath)
+            KfilterVideoProcessor(kfilter, mediaFile, finalPath)
         }
 
         delegate.onError = { onError(it) }

@@ -10,9 +10,7 @@ import java.io.BufferedOutputStream
 import java.io.FileOutputStream
 import java.nio.IntBuffer
 
-internal class KfilterImageProcessor(val shader: Kfilter, val path: String, val pathOut: String) : KfilterProcessor.Delegate(){
-
-    private val mediaFile = KfilterMediaFile(path)
+internal class KfilterImageProcessor(val shader: Kfilter, val mediaFile: KfilterMediaFile, val pathOut: String) : KfilterProcessor.Delegate(){
 
     override fun execute() {
         Executor().execute()
@@ -28,7 +26,7 @@ internal class KfilterImageProcessor(val shader: Kfilter, val path: String, val 
 
         fun performExecute(){
             shader.resize(mediaFile.mediaWidth, mediaFile.mediaHeight)
-            val outputSurface = OutputSurface(shader, true)
+            val outputSurface = OutputSurface(shader, true, true)
             outputSurface.makeCurrent()
 
             val bitmap = loadBitmap(mediaFile)
