@@ -7,6 +7,8 @@
 package com.isaacudy.kfilter.rendering
 
 import android.graphics.SurfaceTexture
+import android.opengl.EGL14
+import android.opengl.EGLExt
 import android.opengl.GLES20
 import android.util.Log
 
@@ -19,6 +21,7 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
     var mediaTexture: SurfaceTexture? = null
         private set
 
+    private var frameTime: Long = 0
     private var frameAvailable = false
     private var adjustViewport = false
 
@@ -79,13 +82,13 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
 
         synchronized(this) {
             if (filterOffset == 0f || secondaryKfilter == null) {
-                kfilter?.draw(surfaceTexture)
+                kfilter?.draw(frameTime, surfaceTexture)
             }
             else {
                 val slidingLeft = filterOffset < 0
                 val currentOffset = filterOffset
-                kfilter?.draw(surfaceTexture, 1 - Math.abs(currentOffset), !slidingLeft)
-                secondaryKfilter?.draw(surfaceTexture, Math.abs(currentOffset) * 1.005f, slidingLeft)
+                kfilter?.draw(frameTime, surfaceTexture, 1 - Math.abs(currentOffset), !slidingLeft)
+                secondaryKfilter?.draw(frameTime, surfaceTexture, Math.abs(currentOffset) * 1.005f, slidingLeft)
             }
         }
         return true
@@ -193,6 +196,12 @@ internal class KfilterMediaRenderer(texture: SurfaceTexture, private var mediaWi
 
         queuedSecondaryKfilter = KfilterRenderer(kfilter).apply {
             setDimensions(mediaWidth, mediaHeight, width, height)
+        }
+    }
+
+    fun setFrameTime(milliseconds: Long){
+        synchronized(this) {
+            frameTime = milliseconds
         }
     }
 

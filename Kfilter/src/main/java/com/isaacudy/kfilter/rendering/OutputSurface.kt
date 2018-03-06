@@ -50,7 +50,7 @@ import javax.microedition.khronos.egl.EGLSurface
  * By default, the Surface will be using a BufferQueue in asynchronous mode, so we
  * can potentially drop frames.
  */
-internal class OutputSurface(kfilter: Kfilter, initEgl: Boolean = false) : SurfaceTexture.OnFrameAvailableListener {
+internal class OutputSurface(kfilter: Kfilter, initEgl: Boolean = false, private val isImage : Boolean = false) : SurfaceTexture.OnFrameAvailableListener {
     private var egl: EGL10? = null
     private var eglDisplay: EGLDisplay? = null
     private var eglContext: EGLContext? = null
@@ -237,7 +237,8 @@ internal class OutputSurface(kfilter: Kfilter, initEgl: Boolean = false) : Surfa
      */
     fun drawImage() {
         surfaceTexture?.let {
-            textureRender?.draw(it)
+            val time = if(isImage) 0 else it.timestamp / 1_000_000L
+            textureRender?.draw(time, it)
         }
     }
 

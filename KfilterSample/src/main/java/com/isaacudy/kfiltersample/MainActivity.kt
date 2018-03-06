@@ -23,7 +23,6 @@ import com.isaacudy.kfilter.filters.*
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlin.concurrent.thread
 
-
 class MainActivity : AppCompatActivity() {
 
     private val ACTIVITY_CHOOSE_FILE = 0

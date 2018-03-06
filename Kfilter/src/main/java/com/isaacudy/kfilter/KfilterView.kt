@@ -347,6 +347,8 @@ class KfilterView @JvmOverloads constructor(context: Context,
                                 onRender()
                                 mediaRenderer.apply {
                                     mediaRenderer.mediaTexture?.let {
+                                        val time = mediaPlayer?.currentPosition?.toLong() ?: 0L
+                                        setFrameTime(time)
                                         onFrameAvailable(it)
                                     }
                                 }
@@ -388,7 +390,9 @@ class KfilterView @JvmOverloads constructor(context: Context,
                     running = false
                 }
                 while (mediaPlayer?.isPlaying == true) {
-                    Thread.sleep(66)
+                    val time = mediaPlayer?.currentPosition?.toLong() ?: 0L
+                    mediaRenderer?.setFrameTime(time)
+                    Thread.sleep(16)
                 }
             }
             catch (ex: IllegalStateException) {
@@ -407,6 +411,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
         }
 
         override fun onRender() {
+            mediaRenderer?.setFrameTime(0)
             surface?.apply {
                 val canvas = lockCanvas(null)
                 canvas.drawARGB(255, 0, 0, 0)
