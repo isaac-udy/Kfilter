@@ -25,6 +25,8 @@ const val ERROR_TIMEOUT = 1
 const val ERROR_MEDIA_PLAYER_CONFIGURE = 2
 const val ERROR_SAVE = 3
 const val ERROR_UNKNOWN_MEDIA_TYPE = 4
+const val ERROR_MEDIA_PLAYER = 5
+const val ERROR_RENDERING = 6
 
 class KfilterView @JvmOverloads constructor(context: Context,
                                             attrs: AttributeSet? = null,
@@ -283,6 +285,10 @@ class KfilterView @JvmOverloads constructor(context: Context,
                     isPrepared = true
                     onPreparedListener(mp)
                 }
+                setOnErrorListener { _, what, extra ->
+                    onErrorListener(ERROR_MEDIA_PLAYER)
+                    false
+                }
                 prepareAsync()
             }
 
@@ -356,6 +362,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
                             }
                             catch (ex: Exception) {
                                 running = false
+                                onErrorListener(ERROR_RENDERING)
                             }
                         }
                     }
@@ -385,19 +392,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
      */
     private inner class VideoRenderThread : RenderThread() {
         override fun onPreRender() {
-            try {
-                if(mediaPlayer == null){
-                    running = false
-                }
-                while (mediaPlayer?.isPlaying == true) {
-                    val time = mediaPlayer?.currentPosition?.toLong() ?: 0L
-                    mediaRenderer?.setFrameTime(time)
-                    Thread.sleep(16)
-                }
-            }
-            catch (ex: IllegalStateException) {
-                // if mediaPlayer.isPlaying throws an exception, that means it's no longer valid,
-                // so we stop running
+            if(mediaPlayer == null){
                 running = false
             }
         }
