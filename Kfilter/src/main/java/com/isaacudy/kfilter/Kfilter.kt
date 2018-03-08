@@ -3,6 +3,7 @@ package com.isaacudy.kfilter
 import android.opengl.GLES20
 import com.isaacudy.kfilter.filters.metadata.Metadata
 import com.isaacudy.kfilter.filters.metadata.MetadataProvider
+import com.isaacudy.kfilter.filters.metadata.metadataProvider
 import com.isaacudy.kfilter.utils.ExternalTexture
 
 /**
@@ -10,7 +11,7 @@ import com.isaacudy.kfilter.utils.ExternalTexture
  *
  * Kfilter
  */
-abstract class Kfilter {
+abstract class Kfilter(private val metadataProvider: MetadataProvider = defaultMetadata) {
 
     var inputWidth: Int = -1
         private set
@@ -40,14 +41,6 @@ abstract class Kfilter {
             _externalTexture = value
         }
 
-    private val metadataProvider = MetadataProvider(
-        mapOf(
-            "kfilterTime" to { long: Long ->
-                Metadata.Uniform1i(long.toInt())
-            }
-        )
-    )
-
     /**
      * Create a copy of this Kfilter. It is important that the output Kfilter does not
      * contain any information such as texture ids that are specific to a particular OpenGL context.
@@ -75,7 +68,7 @@ abstract class Kfilter {
      *
      * The default implementation will bind the externalTexture to the GL_TEXTURE0 target
      */
-    open internal fun onApply() {
+    open protected fun onApply() {
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glUniform1i(externalTexture.id, 0)
     }
@@ -88,19 +81,19 @@ abstract class Kfilter {
      *
      * @param shaderProgram the created shaderProgram that this Kfilter will be rendered using
      */
-    open internal fun onInitialise(shaderProgram: Int) {
+    open protected fun onInitialise(shaderProgram: Int) {
         externalTexture.bind(shaderProgram)
     }
 
     /**
      * Called immediately after the Kfilter has been asked to resize
      */
-    open internal fun onResize() {}
+    open protected fun onResize() {}
 
     /**
      * Called immediately after the Kfilter has been released. Perform any additional OpenGL cleanup here
      */
-    open internal fun onRelease() {}
+    open protected fun onRelease() {}
 
     /**
      * Initialise the Kfilter, binding the input shaderProgram as the shader that will be used to render
@@ -167,6 +160,10 @@ abstract class Kfilter {
     protected open fun finalize() {
         release()
     }
+}
+
+private val defaultMetadata = metadataProvider {
+    metadata("kfilterTime") { time -> Metadata.Uniform1i(time.toInt()) }
 }
 
 /**
