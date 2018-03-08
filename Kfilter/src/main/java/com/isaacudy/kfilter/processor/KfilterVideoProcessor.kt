@@ -463,15 +463,25 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
         val mimeType = extractor.videoMimeType
         var width = -1
         var height = -1
-        val frameRate = 30
-        val bitrate = 10_000_000
+        var frameRate = 30
+        var bitrate = 10_000_000
         val colorFormat = MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
 
-        if (extractor.videoFormat.containsKey(MediaFormat.KEY_WIDTH))
+        if (extractor.videoFormat.containsKey(MediaFormat.KEY_WIDTH)) {
             width = extractor.videoFormat.getInteger(MediaFormat.KEY_WIDTH)
+        }
 
-        if (extractor.videoFormat.containsKey(MediaFormat.KEY_HEIGHT))
+        if (extractor.videoFormat.containsKey(MediaFormat.KEY_HEIGHT)) {
             height = extractor.videoFormat.getInteger(MediaFormat.KEY_HEIGHT)
+        }
+
+        if(extractor.videoFormat.containsKey(MediaFormat.KEY_FRAME_RATE)){
+            frameRate = extractor.videoFormat.getInteger(MediaFormat.KEY_FRAME_RATE)
+        }
+
+        if(extractor.videoFormat.containsKey(MediaFormat.KEY_BIT_RATE)){
+            bitrate = extractor.videoFormat.getInteger(MediaFormat.KEY_BIT_RATE)
+        }
 
         val format = MediaFormat.createVideoFormat(mimeType, width, height)
         format.setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat)
