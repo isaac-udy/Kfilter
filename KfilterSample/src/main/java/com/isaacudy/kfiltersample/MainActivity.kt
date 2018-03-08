@@ -21,6 +21,7 @@ import android.view.TextureView
 import com.isaacudy.kfilter.*
 import com.isaacudy.kfilter.filters.*
 import kotlinx.android.synthetic.main.activity_main.*
+import java.io.File
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
@@ -62,7 +63,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         saveOutputButton.setOnClickListener {
-            kfilterView.getProcessor()?.save("storage/emulated/0/Download/test.png")
+            File("storage/emulated/0/KfilterSample").apply {
+                if(!exists()) mkdirs()
+            }
+            kfilterView.getProcessor()?.save("storage/emulated/0/KfilterSample/sample_${System.currentTimeMillis()}")
         }
     }
 
