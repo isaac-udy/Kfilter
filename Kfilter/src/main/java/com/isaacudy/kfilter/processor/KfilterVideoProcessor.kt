@@ -15,6 +15,7 @@ private const val VERBOSE = true
 internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: KfilterMediaFile, val pathOut: String) : KfilterProcessor.Delegate() {
 
     private val path = mediaFile.path
+    private val tempPathOut = pathOut+".tmp"
     private val extractor: Extractor
 
     init {
@@ -101,8 +102,8 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                 audioDecoder = null
             }
 
-            File(pathOut).parentFile.mkdirs()
-            muxer = MediaMuxer(pathOut, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            File(tempPathOut).parentFile.mkdirs()
+            muxer = MediaMuxer(tempPathOut, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
 
             val retriever = MediaMetadataRetriever()
             retriever.setDataSource(path)
@@ -206,6 +207,12 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                 audioEncoder?.release()
             }
             onProgress(1.0f)
+            try {
+                File(tempPathOut).renameTo(File(pathOut))
+            }
+            catch (e: Exception){
+                onError(e)
+            }
             onSuccess()
         }
 
