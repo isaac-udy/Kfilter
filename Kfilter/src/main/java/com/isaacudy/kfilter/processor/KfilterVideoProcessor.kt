@@ -15,6 +15,7 @@ private const val VERBOSE = true
 internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: KfilterMediaFile, val pathOut: String) : KfilterProcessor.Delegate() {
 
     private val path = mediaFile.path
+    private val tempPathOut = pathOut+".tmp"
     private val extractor: Extractor
 
     init {
@@ -61,7 +62,7 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
             outputFormat = getOutputVideoFormat()
 
             try {
-                encoder = MediaCodec.createEncoderByType(extractor.videoMimeType)
+                encoder = MediaCodec.createEncoderByType(outputFormat.getString(MediaFormat.KEY_MIME))
                 encoder.configure(outputFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             }
             catch (e: MediaCodec.CodecException) {
@@ -72,7 +73,7 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                 // and I haven't found a way to detect if this will occur before encoding begins. Worth exploration in the future.
                 Log.d(TAG, "MediaCodec default config is not valid", e)
                 outputFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
-                encoder = MediaCodec.createEncoderByType(extractor.videoMimeType)
+                encoder = MediaCodec.createEncoderByType(outputFormat.getString(MediaFormat.KEY_MIME))
                 encoder.configure(outputFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             }
 
@@ -86,11 +87,10 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
             decoder.configure(extractor.videoFormat, outputSurface.surface, null, 0)
             decoder.start()
 
-            extractor.audioFormat?.setInteger(MediaFormat.KEY_BIT_RATE, 128_000)
-
             if (extractor.audioMimeType != null) {
-                audioEncoder = MediaCodec.createEncoderByType(extractor.audioMimeType)
-                audioEncoder.configure(extractor.audioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+                val outputAudioFormat = getOutputAudioFormat()
+                audioEncoder = MediaCodec.createEncoderByType(outputAudioFormat.getString(MediaFormat.KEY_MIME))
+                audioEncoder.configure(outputAudioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
                 audioEncoder.start()
 
                 audioDecoder = MediaCodec.createDecoderByType(extractor.audioMimeType)
@@ -102,8 +102,8 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                 audioDecoder = null
             }
 
-            File(pathOut).parentFile.mkdirs()
-            muxer = MediaMuxer(pathOut, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            File(tempPathOut).parentFile.mkdirs()
+            muxer = MediaMuxer(tempPathOut, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
 
             val retriever = MediaMetadataRetriever()
             retriever.setDataSource(path)
@@ -207,6 +207,12 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                 audioEncoder?.release()
             }
             onProgress(1.0f)
+            try {
+                File(tempPathOut).renameTo(File(pathOut))
+            }
+            catch (e: Exception){
+                onError(e)
+            }
             onSuccess()
         }
 
@@ -464,15 +470,25 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
         val mimeType = extractor.videoMimeType
         var width = -1
         var height = -1
-        val frameRate = 30
-        val bitrate = 10_000_000
+        var frameRate = 30
+        var bitrate = 10_000_000
         val colorFormat = MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
 
-        if (extractor.videoFormat.containsKey(MediaFormat.KEY_WIDTH))
+        if (extractor.videoFormat.containsKey(MediaFormat.KEY_WIDTH)) {
             width = extractor.videoFormat.getInteger(MediaFormat.KEY_WIDTH)
+        }
 
-        if (extractor.videoFormat.containsKey(MediaFormat.KEY_HEIGHT))
+        if (extractor.videoFormat.containsKey(MediaFormat.KEY_HEIGHT)) {
             height = extractor.videoFormat.getInteger(MediaFormat.KEY_HEIGHT)
+        }
+
+        if(extractor.videoFormat.containsKey(MediaFormat.KEY_FRAME_RATE)){
+            frameRate = extractor.videoFormat.getInteger(MediaFormat.KEY_FRAME_RATE)
+        }
+
+        if(extractor.videoFormat.containsKey(MediaFormat.KEY_BIT_RATE)){
+            bitrate = extractor.videoFormat.getInteger(MediaFormat.KEY_BIT_RATE)
+        }
 
         val format = MediaFormat.createVideoFormat(mimeType, width, height)
         format.setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat)
@@ -484,6 +500,23 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
         format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, width * height)
         format.setInteger(MediaFormat.KEY_MAX_WIDTH, width)
         format.setInteger(MediaFormat.KEY_MAX_HEIGHT, height)
+        return format
+    }
+
+    fun getOutputAudioFormat(): MediaFormat {
+        if (extractor.audioFormat == null) {
+            throw IllegalStateException("File at '$path' has no audio track, cannot create output format")
+        }
+        val mimeTyoe = "audio/mp4a-latm"
+        val aacProfile = 2
+        val channelCount = extractor.audioFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+        val bitrate = 256_000
+        val sampleRate = extractor.audioFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+
+        val format = MediaFormat.createAudioFormat(mimeTyoe, sampleRate, channelCount)
+        format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
+        format.setInteger(MediaFormat.KEY_AAC_PROFILE, aacProfile)
+
         return format
     }
 
