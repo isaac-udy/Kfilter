@@ -493,7 +493,7 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
         val mimeTyoe = "audio/mp4a-latm"
         val aacProfile = 2
         val channelCount = extractor.audioFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-        val bitrate = 128_000
+        val bitrate = 256_000
         val sampleRate = extractor.audioFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
 
         val format = MediaFormat.createAudioFormat(mimeTyoe, sampleRate, channelCount)
