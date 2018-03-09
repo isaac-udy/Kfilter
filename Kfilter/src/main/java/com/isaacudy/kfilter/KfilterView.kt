@@ -362,7 +362,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
             while (synchronized(this) { running }) {
                 onPreRender()
                 // don't re-render the image unless the kfilterOffset has changed since last time
-                if (lastRenderedPosition != kfilterOffset) {
+                if (lastRenderedPosition != kfilterOffset || mediaPlayer?.isPlaying == true) {
                     mediaRenderer?.let { mediaRenderer ->
                         synchronized(mediaRenderer) {
                             try {
@@ -383,7 +383,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
                         }
                     }
                 }
-                Thread.sleep(16)
+                Thread.sleep(33)
             }
         }
 
