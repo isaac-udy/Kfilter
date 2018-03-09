@@ -65,6 +65,8 @@ class KfilterView @JvmOverloads constructor(context: Context,
     private var surfaceWidth: Int = 0
     private var surfaceHeight: Int = 0
 
+    private var isPlayingOnDetach = false
+
     private var offsetAnimator: ValueAnimator? = null
     private var kfilterOffset = 0f
         set(value) {
@@ -198,6 +200,20 @@ class KfilterView @JvmOverloads constructor(context: Context,
 
         gestureDetector.onTouchEvent(event)
         return true
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+
+        if (hasWindowFocus) {
+            if(isPlayingOnDetach){
+                mediaPlayer?.start()
+            }
+        }
+        else {
+            isPlayingOnDetach = mediaPlayer?.isPlaying ?: false
+            mediaPlayer?.pause()
+        }
     }
 
     //region Rendering
