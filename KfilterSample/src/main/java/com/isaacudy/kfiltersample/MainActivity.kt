@@ -1,24 +1,24 @@
 package com.isaacudy.kfiltersample
 
 import android.app.Activity
-import android.support.v7.app.AppCompatActivity
-import android.os.Bundle
-import android.view.View
-import android.content.Intent
-import android.net.Uri
-import android.provider.MediaStore
-import android.provider.DocumentsContract
-import android.os.Build
 import android.content.ContentUris
 import android.content.Context
+import android.content.Intent
 import android.database.Cursor
 import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.graphics.SurfaceTexture
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
 import android.os.Environment
+import android.provider.DocumentsContract
+import android.provider.MediaStore
+import android.support.v7.app.AppCompatActivity
 import android.view.Surface
 import android.view.TextureView
-import com.isaacudy.kfilter.*
+import android.view.View
+import com.isaacudy.kfilter.BaseKfilter
 import com.isaacudy.kfilter.filters.*
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.File
@@ -31,7 +31,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        if(false){
+        if (false) {
             setContentView(getTestView(this))
             return
         }
@@ -40,10 +40,12 @@ class MainActivity : AppCompatActivity() {
 
 
         val filters = listOf(BaseKfilter(),
-                GrayscaleFilter(),
-                SepiaFilter(),
-                PosterizeFilter(),
-                WarmFilter())
+            GrayscaleFilter(),
+            SepiaFilter(),
+            PosterizeFilter(),
+            WarmFilter(),
+            WobbleFilter())
+
         var item = 0
         kfilterView.setFilters(filters)
         selectFilter.setOnClickListener {
@@ -64,7 +66,7 @@ class MainActivity : AppCompatActivity() {
 
         saveOutputButton.setOnClickListener {
             File("storage/emulated/0/KfilterSample").apply {
-                if(!exists()) mkdirs()
+                if (!exists()) mkdirs()
             }
             kfilterView.getProcessor()?.save("storage/emulated/0/KfilterSample/sample_${System.currentTimeMillis()}")
         }
@@ -73,14 +75,14 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent) {
         if (resultCode != Activity.RESULT_OK) return
         if (requestCode == ACTIVITY_CHOOSE_FILE) {
-            getUriPath(this, data.data)?.let{
+            getUriPath(this, data.data)?.let {
                 kfilterView.setContentPath(it)
             }
         }
     }
 }
 
-fun getTestView(context: Context): View{
+fun getTestView(context: Context): View {
     val view = TextureView(context)
     view.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
 
@@ -111,7 +113,8 @@ fun getTestView(context: Context): View{
                     try {
                         Thread.sleep(20)
                     }
-                    catch(ex: Exception){}
+                    catch (ex: Exception) {
+                    }
                 }
             }
         }
@@ -159,7 +162,7 @@ fun getUriPath(context: Context, uri: Uri): String? {
 
             val id = DocumentsContract.getDocumentId(uri)
             val contentUri = ContentUris.withAppendedId(
-                    Uri.parse("content://downloads/public_downloads"), java.lang.Long.valueOf(id)!!)
+                Uri.parse("content://downloads/public_downloads"), java.lang.Long.valueOf(id)!!)
 
             return getDataColumn(context, contentUri, null, null)
         }
