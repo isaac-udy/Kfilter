@@ -515,6 +515,7 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
 
         val format = MediaFormat.createAudioFormat(mimeTyoe, sampleRate, channelCount)
         format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
+        format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, bitrate)
         format.setInteger(MediaFormat.KEY_AAC_PROFILE, aacProfile)
 
         return format
