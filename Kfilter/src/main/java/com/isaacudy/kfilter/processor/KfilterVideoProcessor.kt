@@ -570,7 +570,15 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                 videoFormat = videoExtractor.getTrackFormat(videoTrack).apply {
 //                    setInteger(MediaFormat.KEY_WIDTH, mediaFile.mediaWidth)
 //                    setInteger(MediaFormat.KEY_HEIGHT, mediaFile.mediaHeight)
+                    if(containsKey("rotation-degrees")){
+                        Log.d(TAG, "ROTATION: ${getInteger("rotation-degrees")}")
+                    }
+                    else {
+                        Log.d(TAG, "NO ROTATION KEY!")
+                    }
                 }
+
+                Log.d(TAG, "Media file info: ${mediaFile.mediaWidth} x ${mediaFile.mediaHeight} @${mediaFile.orientation}")
                 Log.d(TAG, "Extractor created with video format $videoFormat")
             }
             else {
