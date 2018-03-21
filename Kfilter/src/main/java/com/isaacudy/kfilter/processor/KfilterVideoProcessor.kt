@@ -467,7 +467,7 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
             throw IllegalStateException("File at '$path' has no video track, cannot create output format")
         }
 
-        val mimeType = extractor.videoMimeType
+        val mimeType = MediaFormat.MIMETYPE_VIDEO_H263//extractor.videoMimeType
         var width = -1
         var height = -1
         var frameRate = 30
@@ -494,12 +494,14 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
         format.setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat)
         format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
         format.setInteger(MediaFormat.KEY_FRAME_RATE, frameRate)
+        format.setInteger(MediaFormat.KEY_CAPTURE_RATE, frameRate)
 
         // prevent crash on some Samsung devices
         // http://stackoverflow.com/questions/21284874/illegal-state-exception-when-calling-mediacodec-configure?answertab=votes#tab-top
         format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, width * height)
         format.setInteger(MediaFormat.KEY_MAX_WIDTH, width)
         format.setInteger(MediaFormat.KEY_MAX_HEIGHT, height)
+        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 0)
         return format
     }
 
