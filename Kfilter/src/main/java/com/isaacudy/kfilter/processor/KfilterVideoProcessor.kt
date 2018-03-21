@@ -7,6 +7,7 @@ import com.isaacudy.kfilter.rendering.OutputSurface
 import android.util.Log
 import com.isaacudy.kfilter.Kfilter
 import com.isaacudy.kfilter.KfilterMediaFile
+import wseemann.media.FFmpegMediaMetadataRetriever
 import java.io.File
 
 private const val TAG = "KfilterVideoProcessor"
@@ -578,6 +579,14 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                     }
                 }
 
+
+                val fmmr = FFmpegMediaMetadataRetriever()
+                fmmr.setDataSource(path)
+                val height2 = fmmr.extractMetadata(FFmpegMediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+                val width2 = fmmr.extractMetadata(FFmpegMediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+                val rotation2 = fmmr.extractMetadata(FFmpegMediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+
+                Log.d(TAG, "FFMPEG info: $width2 x $height2 @$rotation2")
                 Log.d(TAG, "Media file info: ${mediaFile.mediaWidth} x ${mediaFile.mediaHeight} @${mediaFile.orientation}")
                 Log.d(TAG, "Extractor created with video format $videoFormat")
             }
