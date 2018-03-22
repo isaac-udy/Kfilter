@@ -7,6 +7,7 @@ import com.isaacudy.kfilter.rendering.OutputSurface
 import android.util.Log
 import com.isaacudy.kfilter.Kfilter
 import com.isaacudy.kfilter.KfilterMediaFile
+import com.isaacudy.kfilter.utils.getCodecInfo
 import wseemann.media.FFmpegMediaMetadataRetriever
 import java.io.File
 
@@ -504,6 +505,9 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
         format.setInteger(MediaFormat.KEY_MAX_HEIGHT, height)
         format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 0)
 
+        Log.d(TAG, "Codec info for MIMETYPE_VIDEO_HEVC: ${getCodecInfo(MediaFormat.MIMETYPE_VIDEO_HEVC)}")
+        Log.d(TAG, "Codec info for MIMETYPE_VIDEO_AVC: ${getCodecInfo(MediaFormat.MIMETYPE_VIDEO_AVC)}")
+        Log.d(TAG, "Codec info for MIMETYPE_VIDEO_H263: ${getCodecInfo(MediaFormat.MIMETYPE_VIDEO_H263)}")
         Log.d(TAG, "Created output video format $format")
         return format
     }
