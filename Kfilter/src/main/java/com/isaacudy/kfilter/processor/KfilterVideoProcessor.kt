@@ -144,7 +144,7 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                                     audioExtractor.advance()
                                     frameCount++
                                     if (VERBOSE) {
-                                        Log.d(ContentValues.TAG, "Frame (" + frameCount + ") " +
+                                        Log.d(ContentValues.TAG, "Audio Frame (" + frameCount + ") " +
                                             "PresentationTimeUs:" + bufferInfo.presentationTimeUs +
                                             " Flags:" + bufferInfo.flags +
                                             " TrackIndex:" + trackIndex +
@@ -370,24 +370,6 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
         format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, width * height)
         format.setInteger(MediaFormat.KEY_MAX_WIDTH, width)
         format.setInteger(MediaFormat.KEY_MAX_HEIGHT, height)
-        return format
-    }
-
-    fun getOutputAudioFormat(): MediaFormat {
-        if (extractor.audioFormat == null) {
-            throw IllegalStateException("File at '$path' has no audio track, cannot create output format")
-        }
-        val mimeTyoe = "audio/mp4a-latm"
-        val aacProfile = 2
-        val channelCount = extractor.audioFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-        val bitrate = 256_000
-        val sampleRate = extractor.audioFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-
-        val format = MediaFormat.createAudioFormat(mimeTyoe, sampleRate, channelCount)
-        format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
-        format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, bitrate)
-        format.setInteger(MediaFormat.KEY_AAC_PROFILE, aacProfile)
-
         return format
     }
 
