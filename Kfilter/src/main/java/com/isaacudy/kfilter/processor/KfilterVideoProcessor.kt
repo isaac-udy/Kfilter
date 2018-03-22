@@ -107,6 +107,10 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                     var encoderOutputAvailable = true
                     while (decoderOutputAvailable || encoderOutputAvailable) {
                         encoderOutputAvailable = processEncoderOutput()
+                        // when the muxerVideoTrackIndex is set for the first time, we need to break this loop so that the
+                        // audio processing below can trigger the muxer start
+                        if(!muxerStarted && muxerVideoTrackIndex >= 0) break
+
                         decoderOutputAvailable = processDecoderOutput()
                     }
 
@@ -354,9 +358,7 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
             frameRate = extractor.videoFormat.getInteger(MediaFormat.KEY_FRAME_RATE)
         }
 
-        if(extractor.videoFormat.containsKey(MediaFormat.KEY_BIT_RATE)){
-            bitrate = extractor.videoFormat.getInteger(MediaFormat.KEY_BIT_RATE)
-        }
+        bitrate = Math.min(width * height * 4, bitrate)
 
         val format = MediaFormat.createVideoFormat(mimeType, width, height)
         format.setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat)
