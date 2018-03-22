@@ -10,6 +10,13 @@ import com.isaacudy.kfilter.KfilterMediaFile
 import com.isaacudy.kfilter.utils.getCodecInfo
 import wseemann.media.FFmpegMediaMetadataRetriever
 import java.io.File
+import android.media.MediaCodec.BufferInfo
+import java.nio.ByteBuffer
+import java.nio.file.Files.size
+import android.content.ContentValues.TAG
+
+
+
 
 private const val TAG = "KfilterVideoProcessor"
 private const val VERBOSE = true
@@ -140,23 +147,63 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                         }
                     }
 
-                    val audioExtractor = extractor.audioExtractor
-                    if (!audioOutputDone
-                            && (!muxerStarted || videoOutputDone)
-                            && audioExtractor != null
-                            && audioDecoder != null
-                            && audioEncoder != null) {
-                        if (!audioInputDone) {
-                            audioInputDone = processAudioDecoderInput(audioDecoder, audioExtractor)
-                        }
+                    if(extractor.audioExtractor != null && muxerVideoTrackIndex >= 0 && !audioOutputDone){
+                        muxerAudioTrackIndex = muxer.addTrack(extractor.audioFormat)
+                        muxer.start()
+                        muxerStarted = true
 
-                        var audioDecoderOutputAvailable = true
-                        var audioEncoderOutputAvailable = true
-                        while (audioDecoderOutputAvailable || audioEncoderOutputAvailable) {
-                            audioEncoderOutputAvailable = processAudioEncoderOutput(audioEncoder, muxer)
-                            audioDecoderOutputAvailable = processAudioDecoderOutput(audioDecoder, audioEncoder)
+                        val audioExtractor = extractor.audioExtractor ?: throw IllegalStateException()
+                        val dstBuf = ByteBuffer.allocate(256 * 1024)
+                        val bufferInfo = BufferInfo()
+                        var frameCount = 0
+                        val offset = 100
+                        var sawEOS = false
+
+                        while (!sawEOS) {
+                            bufferInfo.offset = offset
+                            bufferInfo.size = audioExtractor.readSampleData(dstBuf, offset)
+                            if (bufferInfo.size < 0) {
+                                if (VERBOSE) {
+                                    Log.d(TAG, "saw input EOS.")
+                                }
+                                sawEOS = true
+                                bufferInfo.size = 0
+                            }
+                            else {
+                                bufferInfo.presentationTimeUs = audioExtractor.sampleTime
+                                bufferInfo.flags = audioExtractor.sampleFlags
+                                val trackIndex = audioExtractor.sampleTrackIndex
+                                muxer.writeSampleData(muxerAudioTrackIndex, dstBuf, bufferInfo)
+                                audioExtractor.advance()
+                                frameCount++
+                                if (VERBOSE) {
+                                    Log.d(TAG, "Frame (" + frameCount + ") " +
+                                        "PresentationTimeUs:" + bufferInfo.presentationTimeUs +
+                                        " Flags:" + bufferInfo.flags +
+                                        " TrackIndex:" + trackIndex +
+                                        " Size(KB) " + bufferInfo.size / 1024)
+                                }
+                            }
                         }
+                        audioOutputDone = true
                     }
+//                    val audioExtractor = extractor.audioExtractor
+//                    if (!audioOutputDone
+//                            && (!muxerStarted || videoOutputDone)
+//                            && audioExtractor != null
+//                            && audioDecoder != null
+//                            && audioEncoder != null) {
+//                        if (!audioInputDone) {
+//                            audioInputDone = processAudioDecoderInput(audioDecoder, audioExtractor)
+//                        }
+//
+//                        var audioDecoderOutputAvailable = true
+//                        var audioEncoderOutputAvailable = true
+//                        while (audioDecoderOutputAvailable || audioEncoderOutputAvailable) {
+//                            audioEncoderOutputAvailable = processAudioEncoderOutput(audioEncoder, muxer)
+//                            audioDecoderOutputAvailable = processAudioDecoderOutput(audioDecoder, audioEncoder)
+//                        }
+//                    }
                     /**
                      *  !Shout out to Zoe for finding this bug!
                      *  When dequeuing buffers, a short timeout will greatly improve the speed of the
@@ -268,7 +315,7 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                 }
                 if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
                     // forward decoder EOS to encoder
-                    if (VERBOSE) Log.d(TAG, "signaling input EOS")
+                    if (VERBOSE) Log.d(TAG, "Decoder signaling input EOS")
                     encoder.signalEndOfInputStream()
                 }
             }
@@ -312,6 +359,11 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                     val progress = (videoProcessedTimestamp + audioProcessedTimestamp / 2).toFloat() / (videoDuration.toFloat() * 1.5f)
                     onProgress(progress)
                 }
+
+                if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
+                    if (VERBOSE) Log.d(TAG, "Encoder signaling input EOS")
+                }
+
                 videoOutputDone = bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
                 encoder.releaseOutputBuffer(encoderOutputIndex, false)
             }
