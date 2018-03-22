@@ -1,5 +1,6 @@
 package com.isaacudy.kfilter.processor
 
+import android.content.ContentValues
 import android.media.*
 import android.os.Build
 import com.isaacudy.kfilter.rendering.InputSurface
@@ -8,6 +9,7 @@ import android.util.Log
 import com.isaacudy.kfilter.Kfilter
 import com.isaacudy.kfilter.KfilterMediaFile
 import java.io.File
+import java.nio.ByteBuffer
 
 private const val TAG = "KfilterVideoProcessor"
 private const val VERBOSE = true
@@ -40,23 +42,15 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
         val videoDuration: Long
 
         var videoProcessedTimestamp: Long = 0
-        var audioProcessedTimestamp: Long = 0
 
         val muxer: MediaMuxer
         var muxerVideoTrackIndex: Int = -1
-        var muxerAudioTrackIndex: Int = -1
 
         var videoOutputDone = false
-        var audioOutputDone = false
 
         var muxerStarted = false
 
-        val audioEncoder: MediaCodec?
-        val audioDecoder: MediaCodec?
-
         var timeout = 10_000L
-
-        val syncFrames = HashSet<Long>()
 
         init {
             outputFormat = getOutputVideoFormat()
@@ -87,21 +81,6 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
             decoder.configure(extractor.videoFormat, outputSurface.surface, null, 0)
             decoder.start()
 
-            if (extractor.audioMimeType != null) {
-                val outputAudioFormat = getOutputAudioFormat()
-                audioEncoder = MediaCodec.createEncoderByType(outputAudioFormat.getString(MediaFormat.KEY_MIME))
-                audioEncoder.configure(outputAudioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-                audioEncoder.start()
-
-                audioDecoder = MediaCodec.createDecoderByType(extractor.audioMimeType)
-                audioDecoder.configure(extractor.audioFormat, null, null, 0)
-                audioDecoder.start()
-            }
-            else {
-                audioEncoder = null
-                audioDecoder = null
-            }
-
             File(tempPathOut).parentFile.mkdirs()
             muxer = MediaMuxer(tempPathOut, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
 
@@ -115,46 +94,74 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
 
         fun execute() {
             var videoInputDone = false
-            var audioInputDone = false
+            var audioProcessingDone = false
             timeout = 10_000L
 
-            if (extractor.audioExtractor == null) {
-                audioInputDone = true
-                audioOutputDone = true
-            }
-
             try {
-                while (!videoOutputDone || !audioOutputDone) {
-                    if (!videoOutputDone) {
-                        if (!videoInputDone) {
-                            videoInputDone = processDecoderInput()
-                        }
-
-                        var decoderOutputAvailable = true
-                        var encoderOutputAvailable = true
-                        while (decoderOutputAvailable || encoderOutputAvailable) {
-                            encoderOutputAvailable = processEncoderOutput()
-                            decoderOutputAvailable = processDecoderOutput()
-                        }
+                while (!videoOutputDone) {
+                    if (!videoInputDone) {
+                        videoInputDone = processDecoderInput()
                     }
 
-                    val audioExtractor = extractor.audioExtractor
-                    if (!audioOutputDone
-                            && (!muxerStarted || videoOutputDone)
-                            && audioExtractor != null
-                            && audioDecoder != null
-                            && audioEncoder != null) {
-                        if (!audioInputDone) {
-                            audioInputDone = processAudioDecoderInput(audioDecoder, audioExtractor)
-                        }
-
-                        var audioDecoderOutputAvailable = true
-                        var audioEncoderOutputAvailable = true
-                        while (audioDecoderOutputAvailable || audioEncoderOutputAvailable) {
-                            audioEncoderOutputAvailable = processAudioEncoderOutput(audioEncoder, muxer)
-                            audioDecoderOutputAvailable = processAudioDecoderOutput(audioDecoder, audioEncoder)
-                        }
+                    var decoderOutputAvailable = true
+                    var encoderOutputAvailable = true
+                    while (decoderOutputAvailable || encoderOutputAvailable) {
+                        encoderOutputAvailable = processEncoderOutput()
+                        decoderOutputAvailable = processDecoderOutput()
                     }
+
+                    // Once the video track has been added to the muxer,
+                    // we can process the audio and start the muxer
+                    if(muxerVideoTrackIndex >= 0 && !audioProcessingDone){
+                        if(extractor.audioExtractor != null){
+                            Log.d(TAG, "Starting audio processing.")
+                            val audioTrackIndex = muxer.addTrack(extractor.audioFormat)
+                            muxer.start()
+                            muxerStarted = true
+
+                            val audioExtractor = extractor.audioExtractor ?: throw IllegalStateException()
+                            val dstBuf = ByteBuffer.allocate(256 * 1024)
+                            val bufferInfo = MediaCodec.BufferInfo()
+                            var frameCount = 0
+                            val offset = 100
+                            var sawEOS = false
+
+                            while (!sawEOS) {
+                                bufferInfo.offset = offset
+                                bufferInfo.size = audioExtractor.readSampleData(dstBuf, offset)
+                                if (bufferInfo.size < 0) {
+                                    if (VERBOSE) {
+                                        Log.d(TAG, "Audio processing saw input EOS.")
+                                    }
+                                    sawEOS = true
+                                    bufferInfo.size = 0
+                                }
+                                else {
+                                    bufferInfo.presentationTimeUs = audioExtractor.sampleTime
+                                    bufferInfo.flags = audioExtractor.sampleFlags
+                                    val trackIndex = audioExtractor.sampleTrackIndex
+                                    muxer.writeSampleData(audioTrackIndex, dstBuf, bufferInfo)
+                                    audioExtractor.advance()
+                                    frameCount++
+                                    if (VERBOSE) {
+                                        Log.d(ContentValues.TAG, "Audio Frame (" + frameCount + ") " +
+                                            "PresentationTimeUs:" + bufferInfo.presentationTimeUs +
+                                            " Flags:" + bufferInfo.flags +
+                                            " TrackIndex:" + trackIndex +
+                                            " Size(KB) " + bufferInfo.size / 1024)
+                                    }
+                                }
+                            }
+                            Log.d(TAG, "Finished audio processing.")
+                        }
+                        else {
+                            Log.d(TAG, "No audio extractor! Skipping audio processing.")
+                            muxer.start()
+                            muxerStarted = true
+                        }
+                        audioProcessingDone = true
+                    }
+
                     /**
                      *  !Shout out to Zoe for finding this bug!
                      *  When dequeuing buffers, a short timeout will greatly improve the speed of the
@@ -200,17 +207,12 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                 encoder.release()
                 decoder.stop()
                 decoder.release()
-
-                audioDecoder?.stop()
-                audioDecoder?.release()
-                audioEncoder?.stop()
-                audioEncoder?.release()
             }
             onProgress(1.0f)
             try {
                 File(tempPathOut).renameTo(File(pathOut))
             }
-            catch (e: Exception){
+            catch (e: Exception) {
                 onError(e)
             }
             onSuccess()
@@ -249,10 +251,6 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                 if (VERBOSE) Log.d(TAG, "Got decoder output")
                 val doRender = bufferInfo.size != 0
                 decoder.releaseOutputBuffer(outputBufferIndex, doRender)
-
-                if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0) {
-                    syncFrames.add(bufferInfo.presentationTimeUs)
-                }
 
                 if (doRender) {
                     // This waits for the image and renders it after it arrives.
@@ -296,10 +294,6 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                         throw RuntimeException("muxer hasn't started")
                     }
 
-//                    if(syncFrames.contains(bufferInfo.presentationTimeUs)){
-//                        bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME
-//                    }
-
                     // adjust the ByteBuffer values to match BufferInfo (not needed?)
                     encodedData.position(bufferInfo.offset)
                     encodedData.limit(bufferInfo.offset + bufferInfo.size)
@@ -307,7 +301,7 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                     muxer.writeSampleData(muxerVideoTrackIndex, encodedData, bufferInfo)
                     if (VERBOSE) Log.d(TAG, "sent " + bufferInfo.size + " bytes to muxer")
                     videoProcessedTimestamp = (bufferInfo.presentationTimeUs / 1000)
-                    val progress = (videoProcessedTimestamp + audioProcessedTimestamp / 2).toFloat() / (videoDuration.toFloat() * 1.5f)
+                    val progress = (videoProcessedTimestamp).toFloat() / (videoDuration.toFloat() * 1.5f)
                     onProgress(progress)
                 }
                 videoOutputDone = bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
@@ -321,12 +315,9 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                 val newFormat = encoder.getOutputFormat()
                 if (VERBOSE) Log.d(TAG, "Encoder output format changed: " + newFormat)
 
-                // now that we have the Magic Goodies, start the muxer
+                // set the muxerVideoTrackIndex - we're not starting the muxer here, as this will
+                // be handled by the audio processor
                 muxerVideoTrackIndex = muxer.addTrack(newFormat)
-                if (muxerVideoTrackIndex >= 0 && (muxerAudioTrackIndex >= 0 || extractor.audioExtractor == null)) {
-                    muxer.start()
-                    muxerStarted = true
-                }
             }
             else if (encoderOutputIndex == MediaCodec.INFO_TRY_AGAIN_LATER) {
                 if (VERBOSE) Log.d(TAG, "Encoder says try again later: " + encoderOutputIndex)
@@ -337,129 +328,6 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
             }
             return true
         }
-
-        fun processAudioDecoderInput(decoder: MediaCodec, extractor: MediaExtractor): Boolean {
-            val inputBufferIndex = decoder.dequeueInputBuffer(timeout)
-            if (inputBufferIndex >= 0) {
-                val buffer = decoder.getInputBuffer(inputBufferIndex)
-                val sampleSize = extractor.readSampleData(buffer, 0)
-
-                if (sampleSize >= 0) {
-                    val presentationTimeUs = extractor.sampleTime
-                    val flags = extractor.sampleFlags
-                    decoder.queueInputBuffer(inputBufferIndex, 0, sampleSize, presentationTimeUs, flags)
-                    extractor.advance()
-
-                    if (VERBOSE) Log.d(TAG, "Audio decoder read sample @$presentationTimeUs for size $sampleSize")
-                }
-                else {
-                    if (VERBOSE) Log.d(TAG, "Audio decoder EOS Reached")
-                    decoder.queueInputBuffer(inputBufferIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                    return true
-                }
-            }
-            else {
-                if (VERBOSE) Log.d(TAG, "Audio input buffer not available")
-            }
-            return false
-        }
-
-        fun processAudioDecoderOutput(decoder: MediaCodec, encoder: MediaCodec): Boolean {
-            val bufferInfo = MediaCodec.BufferInfo()
-            val outputBufferIndex = decoder.dequeueOutputBuffer(bufferInfo, timeout)
-            if (outputBufferIndex >= 0) {
-                if (VERBOSE) Log.d(TAG, "Audio got decoder output")
-                val doOutput = bufferInfo.size != 0
-
-                if (doOutput) {
-                    val outputBuffer = decoder.getOutputBuffer(outputBufferIndex)
-                    val inputBufferIndex = encoder.dequeueInputBuffer(timeout)
-                    if (inputBufferIndex >= 0) {
-                        val inputBuffer = encoder.getInputBuffer(inputBufferIndex)
-                        inputBuffer.position(0)
-                        inputBuffer.put(outputBuffer)
-                        encoder.queueInputBuffer(
-                                inputBufferIndex,
-                                0,
-                                bufferInfo.size,
-                                bufferInfo.presentationTimeUs,
-                                bufferInfo.flags)
-                    }
-                    else {
-                        Log.d(TAG, "Audio failed to get audio input buffer " + inputBufferIndex)
-                    }
-                }
-                decoder.releaseOutputBuffer(outputBufferIndex, false)
-                if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
-                    // forward decoder EOS to encoder
-                    if (VERBOSE) Log.d(TAG, "Audio signaling input EOS")
-                    audioOutputDone = true
-                }
-            }
-            else if (outputBufferIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                val newFormat = decoder.outputFormat
-                if (VERBOSE) Log.d(TAG, "Audio decoder output format has changed: " + newFormat)
-            }
-            else if (outputBufferIndex == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                if (VERBOSE) Log.d(TAG, "Audio decoder says try again later: " + outputBufferIndex)
-                return false
-            }
-            else {
-                if (VERBOSE) Log.d(TAG, "Audio decoder unknown: " + outputBufferIndex)
-            }
-            return true
-        }
-
-        fun processAudioEncoderOutput(encoder: MediaCodec, muxer: MediaMuxer): Boolean {
-            val bufferInfo = MediaCodec.BufferInfo()
-            val encoderOutputIndex = encoder.dequeueOutputBuffer(bufferInfo, timeout)
-            if (encoderOutputIndex >= 0 && muxerStarted) {
-                if (VERBOSE) Log.d(TAG, "Audio got encoder output")
-                if (bufferInfo.size != 0) {
-                    val encodedData = encoder.getOutputBuffer(encoderOutputIndex)
-
-                    if (muxerAudioTrackIndex < 0) {
-                        throw RuntimeException("Audio muxer hasn't started")
-                    }
-
-                    // adjust the ByteBuffer values to match BufferInfo (not needed?)
-                    encodedData.position(bufferInfo.offset)
-                    encodedData.limit(bufferInfo.offset + bufferInfo.size)
-
-                    muxer.writeSampleData(muxerAudioTrackIndex, encodedData, bufferInfo)
-                    if (VERBOSE) Log.d(TAG, "Audio sent " + bufferInfo.size + " bytes to muxer")
-
-                    audioProcessedTimestamp = (bufferInfo.presentationTimeUs / 1000)
-                    val progress = (videoProcessedTimestamp + audioProcessedTimestamp / 2).toFloat() / (videoDuration.toFloat() * 1.5f)
-                    onProgress(progress)
-                }
-                encoder.releaseOutputBuffer(encoderOutputIndex, false)
-            }
-            else if (encoderOutputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                // should happen before receiving buffers, and should only happen once
-                if (muxerAudioTrackIndex >= 0) {
-                    throw RuntimeException("Audio encoder format changed twice")
-                }
-                val newFormat = encoder.outputFormat
-                if (VERBOSE) Log.d(TAG, "Audio encoder output format changed: " + newFormat)
-
-                // now that we have the Magic Goodies, start the muxer
-                muxerAudioTrackIndex = muxer.addTrack(newFormat)
-                if (muxerVideoTrackIndex >= 0 && muxerAudioTrackIndex >= 0) {
-                    muxer.start()
-                    muxerStarted = true
-                }
-            }
-            else if (encoderOutputIndex == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                if (VERBOSE) Log.d(TAG, "Audio encoder says try again later: " + encoderOutputIndex)
-                return false
-            }
-            else {
-                if (VERBOSE) Log.d(TAG, "Audio failed to get encoder output: " + encoderOutputIndex)
-            }
-            return true
-        }
-
     }
 
     fun getOutputVideoFormat(): MediaFormat {
@@ -494,30 +362,14 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
         format.setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat)
         format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
         format.setInteger(MediaFormat.KEY_FRAME_RATE, frameRate)
+        format.setInteger(MediaFormat.KEY_CAPTURE_RATE, frameRate)
+        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 0)
 
         // prevent crash on some Samsung devices
         // http://stackoverflow.com/questions/21284874/illegal-state-exception-when-calling-mediacodec-configure?answertab=votes#tab-top
         format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, width * height)
         format.setInteger(MediaFormat.KEY_MAX_WIDTH, width)
         format.setInteger(MediaFormat.KEY_MAX_HEIGHT, height)
-        return format
-    }
-
-    fun getOutputAudioFormat(): MediaFormat {
-        if (extractor.audioFormat == null) {
-            throw IllegalStateException("File at '$path' has no audio track, cannot create output format")
-        }
-        val mimeTyoe = "audio/mp4a-latm"
-        val aacProfile = 2
-        val channelCount = extractor.audioFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-        val bitrate = 256_000
-        val sampleRate = extractor.audioFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-
-        val format = MediaFormat.createAudioFormat(mimeTyoe, sampleRate, channelCount)
-        format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
-        format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, bitrate)
-        format.setInteger(MediaFormat.KEY_AAC_PROFILE, aacProfile)
-
         return format
     }
 
@@ -543,11 +395,6 @@ internal class KfilterVideoProcessor(val shader: Kfilter, val mediaFile: Kfilter
                 if (videoFormat == null)
                     throw IllegalStateException("File at '$path' has no video track, cannot get mime type")
                 return videoFormat.getString(MediaFormat.KEY_MIME)
-            }
-
-        val audioMimeType: String?
-            get() {
-                return audioFormat?.getString(MediaFormat.KEY_MIME)
             }
 
         init {
