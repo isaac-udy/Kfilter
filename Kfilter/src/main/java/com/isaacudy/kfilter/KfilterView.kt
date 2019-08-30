@@ -1,3 +1,4 @@
+
 package com.isaacudy.kfilter
 
 import android.animation.ValueAnimator
@@ -66,7 +67,8 @@ class KfilterView @JvmOverloads constructor(context: Context,
     private var surfaceHeight: Int = 0
 
     private var isPlayingOnDetach = false
-
+    var selectedKfilterStart = 0
+    var isChange: Boolean = false
     private var offsetAnimator: ValueAnimator? = null
     private var kfilterOffset = 0f
         set(value) {
@@ -77,6 +79,8 @@ class KfilterView @JvmOverloads constructor(context: Context,
         }
     var selectedKfilter: Int
         get() {
+            if (Math.round(kfilterOffset) == kfilters.size)
+                return 0
             return Math.round(kfilterOffset)
         }
         set(value) {
@@ -102,6 +106,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
     fun setFilters(incomingFilters: List<Kfilter>) {
         clearFilters()
         kfilters.addAll(incomingFilters)
+        selectedKfilter = kfilters.size - 1
         mediaRenderer?.apply { setKfilter(kfilters[selectedKfilter]) }
     }
 
@@ -183,14 +188,17 @@ class KfilterView @JvmOverloads constructor(context: Context,
         if (!gesturesEnabled) return false
 
         if (event.action == MotionEvent.ACTION_DOWN) {
+            isChange = true
             offsetAnimator?.apply { cancel() }
             offsetAnimator = null
         }
 
         if (event.action == MotionEvent.ACTION_UP) {
+            isChange = false
             offsetAnimator?.apply { cancel() }
             offsetAnimator = null
 
+//            offsetAnimator = ValueAnimator.ofFloat(kfilterOffset, selectedKfilter.toFloat()).setDuration(225)
             offsetAnimator = ValueAnimator.ofFloat(kfilterOffset, selectedKfilter.toFloat()).setDuration(225)
             offsetAnimator?.addUpdateListener {
                 kfilterOffset = it.animatedValue as Float
@@ -270,7 +278,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
         surface = Surface(videoTexture)
     }
 
-    private fun releaseRenderingResources() {
+    public fun releaseRenderingResources() {
         kfilters.forEach { it.release() }
         mediaRenderer?.release()
         mediaRenderer = null
@@ -344,6 +352,26 @@ class KfilterView @JvmOverloads constructor(context: Context,
     override fun onSurfaceTextureUpdated(st: SurfaceTexture) {
     }
     //endregion
+
+    fun test(isLeft: Boolean, x1: Float, x2: Float) {
+        if (isChange) {
+            if ((x1 - x2) <= -80) {
+//                Log.d("tab_direction ", "left to right")
+                if (selectedKfilterStart == 0 || selectedKfilterStart == kfilters.size - 1) {
+                    selectedKfilterStart = kfilters.size - 1
+                    isChange = false
+                }
+            } else if (isLeft && (x1 - x2) >= 80) {
+//                Log.d("tabi_direction ", "right to left")
+                if (selectedKfilterStart == 0 || selectedKfilterStart == kfilters.size - 1) {
+                    selectedKfilterStart = 0
+
+                    isChange = false
+                }
+            }
+        }
+
+    }
 
     private inner open class RenderThread : Thread() {
 
@@ -438,9 +466,12 @@ class KfilterView @JvmOverloads constructor(context: Context,
 
     private inner class GestureListener : GestureDetector.SimpleOnGestureListener() {
 
-        var selectedKfilterStart = 0
-
         override fun onDown(e: MotionEvent?): Boolean {
+            if (selectedKfilter == 0) {
+                selectedKfilter = kfilters.size
+            } else if (selectedKfilter == kfilters.size - 1) {
+                selectedKfilter = 0
+            }
             selectedKfilterStart = selectedKfilter
             return super.onDown(e)
         }
@@ -458,11 +489,22 @@ class KfilterView @JvmOverloads constructor(context: Context,
         }
 
         override fun onFling(e1: MotionEvent, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+            val yDistance: Float = Math.abs(e1.getY() - e2.getY())
+            val velocityY1 = Math.abs(velocityY)
+            if (velocityY1 > 400 && yDistance > 400) {
+                return if (e1.getY() > e2.getY()) // bottom to up
+                    true
+                else
+                    true
+            }
+
             val direction = if (velocityX < 0) 1 else -1
             if (Math.abs(velocityX) > 1000) {
                 offsetAnimator?.apply { cancel() }
                 offsetAnimator = null
 
+//                offsetAnimator = ValueAnimator.ofFloat(kfilterOffset, (selectedKfilterStart + direction).toFloat()).setDuration(225)
+                //start
                 offsetAnimator = ValueAnimator.ofFloat(kfilterOffset, (selectedKfilterStart + direction).toFloat()).setDuration(225)
                 offsetAnimator?.addUpdateListener {
                     kfilterOffset = it.animatedValue as Float
@@ -474,8 +516,16 @@ class KfilterView @JvmOverloads constructor(context: Context,
 
         override fun onScroll(e1: MotionEvent, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
             val distance = (e1.x - e2.x) / surfaceWidth
+
+            if (e1.x > e2.x) {
+                test(true, e1.x, e2.x)
+            } else {
+                test(false, e1.x, e2.x)
+            }
+
             kfilterOffset = selectedKfilterStart + distance
             return true
         }
     }
+
 }
