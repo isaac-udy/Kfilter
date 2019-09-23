@@ -197,8 +197,6 @@ class KfilterView @JvmOverloads constructor(context: Context,
             isChange = false
             offsetAnimator?.apply { cancel() }
             offsetAnimator = null
-
-//            offsetAnimator = ValueAnimator.ofFloat(kfilterOffset, selectedKfilter.toFloat()).setDuration(225)
             offsetAnimator = ValueAnimator.ofFloat(kfilterOffset, selectedKfilter.toFloat()).setDuration(225)
             offsetAnimator?.addUpdateListener {
                 kfilterOffset = it.animatedValue as Float
@@ -353,19 +351,16 @@ class KfilterView @JvmOverloads constructor(context: Context,
     }
     //endregion
 
-    fun test(isLeft: Boolean, x1: Float, x2: Float) {
+    private fun checkFilterSwipeDirection(isLeft: Boolean, x1: Float, x2: Float) {
         if (isChange) {
             if ((x1 - x2) <= -80) {
-//                Log.d("tab_direction ", "left to right")
                 if (selectedKfilterStart == 0 || selectedKfilterStart == kfilters.size - 1) {
                     selectedKfilterStart = kfilters.size - 1
                     isChange = false
                 }
             } else if (isLeft && (x1 - x2) >= 80) {
-//                Log.d("tabi_direction ", "right to left")
                 if (selectedKfilterStart == 0 || selectedKfilterStart == kfilters.size - 1) {
                     selectedKfilterStart = 0
-
                     isChange = false
                 }
             }
@@ -491,20 +486,14 @@ class KfilterView @JvmOverloads constructor(context: Context,
         override fun onFling(e1: MotionEvent, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
             val yDistance: Float = Math.abs(e1.getY() - e2.getY())
             val velocityY1 = Math.abs(velocityY)
-            if (velocityY1 > 400 && yDistance > 400) {
-                return if (e1.getY() > e2.getY()) // bottom to up
-                    true
-                else
-                    true
-            }
+            
+            if (velocityY1 > 400 && yDistance > 400) return true
 
             val direction = if (velocityX < 0) 1 else -1
             if (Math.abs(velocityX) > 1000) {
                 offsetAnimator?.apply { cancel() }
                 offsetAnimator = null
-
-//                offsetAnimator = ValueAnimator.ofFloat(kfilterOffset, (selectedKfilterStart + direction).toFloat()).setDuration(225)
-                //start
+              
                 offsetAnimator = ValueAnimator.ofFloat(kfilterOffset, (selectedKfilterStart + direction).toFloat()).setDuration(225)
                 offsetAnimator?.addUpdateListener {
                     kfilterOffset = it.animatedValue as Float
@@ -516,13 +505,7 @@ class KfilterView @JvmOverloads constructor(context: Context,
 
         override fun onScroll(e1: MotionEvent, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
             val distance = (e1.x - e2.x) / surfaceWidth
-
-            if (e1.x > e2.x) {
-                test(true, e1.x, e2.x)
-            } else {
-                test(false, e1.x, e2.x)
-            }
-
+            checkFilterSwipeDirection(e1.x > e2.x, e1.x, e2.x)
             kfilterOffset = selectedKfilterStart + distance
             return true
         }
