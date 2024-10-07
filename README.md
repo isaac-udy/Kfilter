@@ -1,3 +1,6 @@
+> [!WARNING]  
+> This project is not actively maintained and has not been actively maintained since pre-2020.
+
 # Kfilter
 
 Kfilter is a small image processing library. Kfilter aims to provide a simple interface to create photo and video filters as you would find in applications such as Snapchat or Instagram. 
