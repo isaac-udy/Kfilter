@@ -85,7 +85,13 @@ class KfilterView @JvmOverloads constructor(context: Context,
         }
         set(value) {
             kfilterOffset = value.toFloat()
-            mediaRenderer?.apply { filterOffset = 0f }
+            try {
+                mediaRenderer?.apply { filterOffset = 0f }
+            }
+            catch (ex: Exception) {
+                running = false
+                onErrorListener(ERROR_RENDERING)
+            }
         }
 
     init {
@@ -107,7 +113,13 @@ class KfilterView @JvmOverloads constructor(context: Context,
         clearFilters()
         kfilters.addAll(incomingFilters)
         selectedKfilter = kfilters.size - 1
-        mediaRenderer?.apply { setKfilter(kfilters[selectedKfilter]) }
+        try{
+            mediaRenderer?.apply { setKfilter(kfilters[selectedKfilter]) }
+        }
+        catch (ex: Exception) {
+            running = false
+            onErrorListener(ERROR_RENDERING)
+        }
     }
 
     private fun clearFilters() {
@@ -157,19 +169,25 @@ class KfilterView @JvmOverloads constructor(context: Context,
         if(primary < 0) primary = 0
         if(secondary < 0) secondary = 0
 
-        mediaRenderer?.apply {
-            var primaryKfilter: Kfilter = BaseKfilter()
-            if(kfilters.size > primary){
-                primaryKfilter = kfilters[primary]
-            }
+        try {
+            mediaRenderer?.apply {
+                var primaryKfilter: Kfilter = BaseKfilter()
+                if (kfilters.size > primary) {
+                    primaryKfilter = kfilters[primary]
+                }
 
-            var secondaryKfilter: Kfilter = BaseKfilter()
-            if(kfilters.size > primary){
-                secondaryKfilter = kfilters[secondary]
-            }
+                var secondaryKfilter: Kfilter = BaseKfilter()
+                if (kfilters.size > primary) {
+                    secondaryKfilter = kfilters[secondary]
+                }
 
-            setKfilter(primaryKfilter, secondaryKfilter)
-            filterOffset = (selectedKfilter - kfilterOffset)
+                setKfilter(primaryKfilter, secondaryKfilter)
+                filterOffset = (selectedKfilter - kfilterOffset)
+            }
+        }
+        catch (ex: Exception) {
+            running = false
+            onErrorListener(ERROR_RENDERING)
         }
     }
 
@@ -253,9 +271,15 @@ class KfilterView @JvmOverloads constructor(context: Context,
     private fun prepareRenderingResources() {
         val texture = texture ?: return
 
-        mediaRenderer = KfilterMediaRenderer(texture, surfaceWidth, surfaceHeight, externalTexture).apply {
-            setMediaSize(contentFile?.mediaWidth ?: -1, contentFile?.mediaHeight ?: -1)
-            setKfilter(kfilters[selectedKfilter])
+        try{
+            mediaRenderer = KfilterMediaRenderer(texture, surfaceWidth, surfaceHeight, externalTexture).apply {
+                setMediaSize(contentFile?.mediaWidth ?: -1, contentFile?.mediaHeight ?: -1)
+                setKfilter(kfilters[selectedKfilter])
+            }
+        }
+        catch (ex: Exception) {
+            running = false
+            onErrorListener(ERROR_RENDERING)
         }
 
         var videoTexture: SurfaceTexture? = null
@@ -445,7 +469,13 @@ class KfilterView @JvmOverloads constructor(context: Context,
         }
 
         override fun onRender() {
-            mediaRenderer?.setFrameTime(0)
+            try{
+                mediaRenderer?.setFrameTime(0)
+            }
+            catch (ex: Exception) {
+                running = false
+                onErrorListener(ERROR_RENDERING)
+            }
             surface?.apply {
                 val canvas = lockCanvas(null)
                 canvas.drawARGB(255, 0, 0, 0)
